@@ -20,9 +20,9 @@ program fitexp
 
 use problem_data
 implicit none
-integer :: i, j, status, ntrials, it, narg
+integer :: i, j, status, ntrials, it, narg, nrepeat
 double precision :: x_temp, y_temp, f, drand, seed, fbest, f_val,&
-                    x_scale, y_scale, c, c_precision
+                    x_scale, y_scale, c, c_precision, r_precision
 character(len=200) :: inputfile, record, datafile, outputfile, keyword,&
                       value
 double precision, allocatable :: x(:), g(:), l(:), u(:), xbest(:)
@@ -32,7 +32,7 @@ call version
 
 ! Some default parameters
 
-ntrials = 10
+ntrials = 5
 x_scale = 1.d0
 y_scale = 1.d0
 startat = 1
@@ -41,6 +41,7 @@ nterms = 1
 outputfile = "fitexp.dat"
 set_bounds = .false.
 c_precision = 1.d-1
+r_precision = 1.d-10
 
 ! Check arguments
 
@@ -195,7 +196,10 @@ write(*,"( '#',/,'#',55('-'),/,35('-') )",advance="no")
 
 seed = 1.825242d0
 fbest = 1.d20
-do it = 1, ntrials
+nrepeat = 0
+it = 0 
+do while( nrepeat < ntrials )
+  it = it + 1
 
 ! Random initial point of this trial
 
@@ -225,6 +229,16 @@ do it = 1, ntrials
   write(*,"( 35a )",advance="no") (char(8),i=1,35)
   write(*,"( '# TRIAL ', i6, ' ERROR = ', e12.6 )",advance="no") it, f
 
+! If the solution is the same as before, increase nrepeat
+
+  if ( abs(f-fbest)/n < r_precision ) then
+    nrepeat = nrepeat + 1
+  else
+    if ( f < fbest ) then
+      nrepeat = 0
+    end if
+  end if
+
 ! Save best solution
 
   if( f < fbest ) then
@@ -243,7 +257,7 @@ do it = 1, ntrials
       write(*,"( '#',tr5'+',f14.6,'*exp( -x / ',f14.6,')' )")&
                 xbest(i), 1.d0 / xbest(nterms+i)
     end do
-    write(*,"( '#',/,'#',55('-'),/,35('-') )",advance="no")
+    write(*,"( '#',/,'#',55('-'),/,'#',34(' ') )",advance="no")
 
     fbest = f
     do i = 1, n
@@ -286,6 +300,8 @@ do it = 1, ntrials
 
 end do
 write(*,*)
+write(*,"(a,i5,a)") "# The best solution was found ",ntrials," times."
+write(*,"(a)") "# END. "
 
 end
 
