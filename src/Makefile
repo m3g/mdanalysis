@@ -50,7 +50,7 @@ all : $(BIN)/energy \
       $(BIN)/perresidueavg \
       $(BIN)/lifetime \
       $(BIN)/gssfree \
-      warning
+      warning $(BIN) $(OBJ)
 
 #
 # energy module
@@ -260,11 +260,17 @@ $(OBJ)/gssfree.o : $(SRC)/gssfree.f90
 # This is common for all packages
 #
 
-$(OBJ)/common.o : $(SRC)/common.f90 
+$(OBJ)/common.o : $(SRC)/common.f90 $(BIN) $(OBJ)
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/common.o $(SRC)/common.f90
 
-$(OBJ)/version.o : $(SRC)/version.f90 
+$(OBJ)/version.o : $(SRC)/version.f90 $(BIN) $(OBJ)
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/version.o $(SRC)/version.f90
+
+$(BIN) : 
+	mkdir -p $(BIN)
+
+$(OBJ) : 
+	mkdir -p $(OBJ)
 
 
 warning : 
