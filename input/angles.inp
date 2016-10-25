@@ -1,0 +1,40 @@
+#
+# Example input file for angles.f90
+#
+# Version 16.146
+#
+
+# System:
+psf /Bis/scratch2/leandro/1K90/structures/1K90.ready.psf
+dcd /Bis/scratch2/leandro/1K90/control/output/1K90.1.dcd
+
+# Group definitions: group1 and group2 can be VMD-style selections
+# if the program is running from the angles.sh script (and VMD is available)
+atom1 segname ATP and name C1'
+atom2 segname ATP and name C3' 
+atom3 segname ATP and name C3'
+atom4 segname ATP and name C4'
+
+# Otherwise, use a pdb file with beta factors (1.00 for group1 and 2.00 for group2)
+#groups ./teste.pdb
+
+# Output file:
+output angles.dat
+
+# Options to consider frames
+firstframe 1
+lastframe last
+stride 1
+
+# Scale the x-axis by
+scaletime 0.001
+
+# Periodic cell (use: no, readfromdcd, or three real numbers)
+# In this case the use of periodic conditions must be accompannied
+# with the centeratom option
+periodic no
+#periodic readfromdcd
+#periodic 80.785998702 80.7870016098 80.78000
+#centeratom 2759
+
+

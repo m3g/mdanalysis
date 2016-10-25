@@ -1,0 +1,68 @@
+#
+# * IMPORTANT:
+#
+# There are two ways to define the emission vector. The
+# first is to directly define it, as the absorption vector, using the 
+# average position of two series of atoms. You would want to use this
+# option if you know how to define the emission vector in terms of the
+# position of the atoms. In this case, use theta = 0 (or comment the
+# theta definition line).
+#
+# The second option, usually more common, is when you know a good way to
+# define the absorption vector from atomic positions, but you cannot do
+# the same for the emission vector. You probably know the angle between
+# the two vectors, and more or less the plane in which they are
+# contained. In this case, the definition of the emission vector serves
+# ONLY to, in conjunction with the absorption vector, define the plane
+# in which these two vectors are contained. The emission vector will be
+# computed by a rotation of the absorption vector, in this plane,
+# according to angle theta. A good idea is to check the definition of
+# the vectors that are output in the first frame over the structure,
+# using the "draw line" VMD command. 
+#
+# Version 16.146
+#
+
+# DCD trajectory files: 
+
+dcd  ../output/production.0.dcd
+dcd  ../output/production.1.dcd
+
+# First and last frames to consider (integer number or "last" )
+
+firstframe 1
+lastframe last
+
+# Scaletime is used to scale the time in the output
+
+scaletime 0.01
+
+# Output file name 
+
+output tcf.dat
+
+# Normalization for anistropy at t=0 (usually 0.4)
+
+r0 0.4
+
+# Points defining the absorption and emission vectors: each vector is the normalized
+# vector computed from the difference of 'start' and 'end' points. Each
+# point is computed from the average position of atoms sets. The first
+# number is the number of atoms to be used for the definition of each
+# point, and the index of the atoms follow.  
+
+abs_vector_start    2   4458 4459
+abs_vector_end      2   4462 4463
+
+emi_vector_start    2   4458 4459
+emi_vector_end      2   4462 4463
+
+# Angle between absorption and emission dipole moments (degrees) - see
+# above
+
+#theta 10.5
+
+# Periodic boundary conditions options (not implemented in TCF!)
+#centeratom
+periodic no
+

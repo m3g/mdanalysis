@@ -1,0 +1,11 @@
+#
+# Example input file for jarzynski module
+#
+# Version 16.146
+#
+# List of namd log files with SMD output:
+/media/disk/smd/output/smd.1.log
+/media/disk/smd/output/smd.2.log
+/media/disk/smd/output/smd.3.log
+/media/disk/smd/output/smd.4.log
+/media/disk/smd/output/smd.5.log

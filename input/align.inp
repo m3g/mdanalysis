@@ -1,0 +1,74 @@
+#
+# Example input file for align.f90
+#
+# Version 16.146
+#
+
+# System:
+psf ../structures/ppar+rosi.12.apo.psf
+
+# Trajectory
+
+dcd ../output/production.0.dcd
+dcd ../output/production.1.dcd
+
+# Group definitions: mobile and reference can be VMD-style selections
+# if the program is running from the align.sh script (and VMD is available)
+# The RMSD of the "compute_rmsd_of" selection will be computed twice: First, the
+# the internal mobility is computed (that is, it is aligned to itself and
+# the normal RMSD is calculated). Second, the "reference" selection is
+# aligned and the RMSD the "compute_rmsd_of" selection are computed
+# according to the new movements. 
+# Therefore, this provides a measure of the relative movements
+# between the two selections. If "compute_rmsd_of" and "reference" 
+# are the same, the results will be identical.
+
+compute_rmsd_of protein and name CA
+reference protein and name CA
+
+# Otherwise, use a pdb file with beta factors 
+# (1.00 for the reference and 2.00 for compute_rmsd_of)
+#groups ./teste.pdb
+
+# Reference frame for alignment examples:
+# Align to an external dcd file:
+#alignto ../structures/ppar+rosi.12.apo.pdb
+# Align to the first or last frame of the dcd file:
+#alignto dcdfirst
+#alignto dcdlast
+# Align to frame 1000 from the DCD file (or any other):
+#alignto 1000
+# Align to average structure from dcd file:
+alignto dcdaverage
+
+# Output files:
+# This file contains the RMSD as a function of the simulation frames.
+
+output align.dat
+
+# This file (optional) is a pdb file containing the "mobile" selection
+# aligned to itself (this may be a huge file!)
+
+#writeinter inter.pdb
+
+# This file (optional) is a pdb file of all selections in which the
+# "reference" selection is aligned (this may be a huge file!)
+
+#writerel relative.pdb
+
+# This file (optional) contains the time-averaged RMSD of each residue relative
+# through the simulation. The alignment considered is the alignment of the
+# 'reference' atoms. It is a PDB file, containing in the "occupancy" column the 
+# absolute RMSD values, and in the "b-factor" column the same data scaled 
+# between 0 and 1.
+
+write_per_residue perresidue.pdb
+
+# Frames to be considered:
+firstframe 1
+lastframe last
+stride 1
+
+# Scale the x-axis by
+scaletime 0.001
+

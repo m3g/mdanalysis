@@ -1,0 +1,42 @@
+#
+# Example input file for solvation.f90
+#
+# Version 16.146
+#
+
+psf /home/leandro/Documents/tcf/ppar/ppar+rosi/0/structures/ppar+rosi.psf 
+dcd ./teste.dcd
+
+# Size of the solvation shell
+shellsize 4.0
+
+# Group definitions: group1 and group2 can be VMD-style selections
+# if the program is running from the solvation.sh script (and VMD is available)
+solute segname PPAR
+solvent resname TIP3
+
+# Otherwise, use a pdb file with beta factors (1.00 for group1 and 2.00 for group2)
+#groups ./teste.pdb
+
+# Output file:
+output solvation.dat
+
+# Optional output file for solvation per residue (makes computation slower)
+#perresidue perresidue.dat
+
+# Options:
+firstframe 1
+lastframe last
+stride 1
+
+# Scale the x-axis by
+scaletime 0.001
+
+# Periodic cell (use: no, readfromdcd, or three real numbers)
+#periodic no
+periodic readfromdcd
+#periodic 80.785998702 80.7870016098 80.78000
+
+# Technical parameter: the dimension of the solv_list array (optional)
+#nsolvlist 10000
+

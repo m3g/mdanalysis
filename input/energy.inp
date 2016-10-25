@@ -1,0 +1,43 @@
+#
+# Example input file for energy.f90
+#
+# Version 16.146
+#
+
+# System:
+psf /Bis/scratch2/leandro/1SK6/psfgen/1SK6.ready.psf
+dcd /Bis/scratch2/leandro/1SK6/control/1SK6.control.dcd
+
+# Group definitions: group1 and group2 can be VMD-style selections
+# if the program is running from the energy.sh script (and VMD is available)
+group1 resname CMP and name C13
+group2 resname CAL
+
+# Otherwise, use a pdb file with beta factors (1.00 for group1 and 2.00 for group2)
+#groups ./teste.pdb
+
+# Output file:
+output test.dat
+
+# Options:
+firstframe 1
+lastframe last 
+stride 1
+cutoff -1.
+
+# Scale the x-axis by
+scaletime 0.001
+
+# Periodic cell (use: no, readfromdcd, or three real numbers)
+periodic readfromdcd
+#periodic no
+#periodic 80.785998702 80.7870016098 80.78000
+#centeratom 2759
+
+# Parameter files
+par /home/Bis/leandro/programs/toppar/charmm/par_all27_prot_na.prm
+par /home/Bis/leandro/programs/toppar/par_cmp.inp
+par /home/Bis/leandro/programs/toppar/par_pyp.inp
+
+
+

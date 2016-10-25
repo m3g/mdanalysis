@@ -1,0 +1,43 @@
+#
+# Example input file for hbonds.f90
+#
+# Version 16.146
+#
+
+# System:
+psf ./test.psf 
+dcd ./test.dcd
+
+# Group definitions: group1 and group2 can be VMD-style selections
+# if the program is running from the energy.sh script (and VMD is available)
+group1 segname PPAR
+group2 resname TIP3
+
+# Otherwise, use a pdb file with group definition 
+#groups ./teste.pdb
+
+# Output file:
+output test.dat
+
+# Options:
+firstframe 1
+lastframe last 
+stride 1
+
+# Scale the x-axis by
+scaletime 0.001
+
+# Definition of a hydrogen bond (default values: 20. and 3.)
+angle 20.
+distance 3.
+
+# Periodic cell (use: no, readfromdcd, or three real numbers)
+periodic readfromdcd
+#periodic 80.785998702 80.7870016098 80.78000
+#periodic no
+
+# If you want to print the file containing the data used for hbond lifetime
+# computation, uncomment and set the output file name (and use the lifetime
+# program to interpret the data afterwards): 
+lifetime lifetime.dat
+

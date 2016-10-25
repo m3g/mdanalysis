@@ -1,0 +1,57 @@
+#
+# Example input file for gss.f90
+#
+# Version 16.146
+#
+
+# System:
+psf /home/leandro/Downloads/ivan0.psf
+dcd /home/leandro/Downloads/ivan0.dcd
+
+# Group definitions: group1 and group2 can be VMD-style selections
+# if the program is running from the gss.sh script (and VMD is available)
+solute protein and hydrophobic
+solvent resname TIP3
+
+# Optionally, you can set a different selection from the solute to be the
+# volume excluded in the computation (this affects the normalization of
+# the gss function). For example, the excluded volume can be a complete
+# protein, while the gss is computed only for the hydrophobic residues.
+# If "exclude" is not set, it will be the "solute" selection. 
+exclude protein
+
+# Otherwise, use a pdb file with beta factors (1.00 for group1 and 2.00 for group2)
+# and "1.00" in the occupancy factor for the excluded selection.
+#groups ./teste.pdb
+
+# Output GSS file:
+output gss.dat
+
+# Options to consider frames
+firstframe 1
+lastframe last
+stride 1
+
+# Periodic cell (use: no, readfromdcd, or three real numbers)
+periodic readfromdcd
+#periodic 80.785998702 80.7870016098 80.78000
+
+# Cutoff (default: 10.)
+cutoff 10.
+
+# Options for the gss slabing, usually you dont need to set them,
+# default parameters are fine. 
+# gssmax is the maximum distance to be considered and nslabs is
+# the number of volume slices within 0. and gssmax.
+#gssmax 20.
+#nslabs 1000
+
+# Density of the system: Used for the simple estimation of solute
+# volume. Default value is 1 g/ml
+#density 1.
+
+# Probe side: Used for the estimation of the solute volume
+# Default: 2 Angstrom.
+probeside 2.
+
+

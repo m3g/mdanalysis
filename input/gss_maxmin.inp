@@ -1,0 +1,45 @@
+#
+# Example input file for gss.f90
+#
+# Version 16.146
+#
+
+# System:
+psf ./cysfluor_solvated.ready.psf 
+dcd ./cysfluor_solvated.production.9.dcd
+par ./pars.prm
+
+# Group definitions: group1 and group2 can be VMD-style selections
+# if the program is running from the gss.sh script (and VMD is available)
+solute resname CYFL
+solvent resname TIP3
+
+# Otherwise, use a pdb file with beta factors (1.00 for group1 and 2.00 for group2)
+#groups ./teste.pdb
+
+# Output file:
+output gss.dat
+
+# Options to consider frames
+firstframe 1
+lastframe last
+stride 1
+
+# Periodic cell (use: no, readfromdcd, or three real numbers)
+#periodic no
+periodic readfromdcd
+#periodic 80.785998702 80.7870016098 80.78000
+#centeratom 2759
+
+# Options for the gss slabing, usually you dont need to set them,
+# default parameters are fine. 
+# gssmax is the maximum distance to be considered and nslabs is
+# the number of volume slices within 0. and gssmax.
+#gssmax 20.
+#nslabs 1000
+
+# Density of the system: Used for the simple estimation of solute
+# volume. Default value is 1 g/ml
+# density 1.
+
+

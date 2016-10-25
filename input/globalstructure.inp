@@ -1,0 +1,20 @@
+#
+# Globalstructure input file example
+#
+# Version 16.146
+#
+pdbfile     system.pdb
+dcdfile     system.dcd
+reference   DCD
+firstframe  1
+lastframe   LAST
+timestep    1 
+scaletime   1.
+firstatom   1
+lastatom    12000 
+atomtype    CA
+segment     EF
+contact     7.0
+rmsdout     rmsdout.dat
+natiout     nativecontacts.dat
+gyraout     gyration.dat
