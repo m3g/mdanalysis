@@ -22,7 +22,7 @@ use problem_data
 implicit none
 integer :: i, j, status, ntrials, it, narg, nrepeat
 double precision :: x_temp, y_temp, f, drand, seed, fbest, f_val,&
-                    x_scale, y_scale, c, c_precision, r_precision
+                    y0, c, c_precision, r_precision
 character(len=200) :: inputfile, record, datafile, outputfile, keyword,&
                       value
 double precision, allocatable :: x(:), g(:), l(:), u(:), xbest(:)
@@ -33,8 +33,6 @@ call version
 ! Some default parameters
 
 ntrials = 5
-x_scale = 1.d0
-y_scale = 1.d0
 startat = 1
 stopat = 100000
 nterms = 1
@@ -76,12 +74,6 @@ do
     case ("n_trials")
       record = value(record)
       read(record,*) ntrials
-    case ("x_scale")
-      record = value(record)
-      read(record,*) x_scale
-    case ("y_scale")
-      record = value(record)
-      read(record,*) y_scale
     case ("linear_term_precision")
       record = value(record)
       read(record,*) c_precision
@@ -167,6 +159,7 @@ do
   if( x_temp >= startat .and. &
       x_temp <= stopat ) then 
     ndata = ndata + 1
+    if ( ndata == 1 ) y0 = y_temp
   end if
 end do
 rewind(10)
@@ -184,8 +177,8 @@ do
   if( x_temp >= startat .and. &
       x_temp <= stopat ) then 
     ndata = ndata + 1
-    xdata(ndata) = x_temp * x_scale
-    ydata(ndata) = y_temp * y_scale
+    xdata(ndata) = x_temp
+    ydata(ndata) = y_temp / y0
   end if
 end do
 write(*,"( '# Number of data points: ',i8 )") ndata
@@ -201,17 +194,17 @@ it = 0
 do while( nrepeat < ntrials )
   it = it + 1
 
-! Random initial point of this trial
+  ! Random initial point of this trial
 
   do i = 1, n
     x(i) = l(i) + drand(seed) * ( u(i) - l(i) )
   end do
 
-! Call solver
+  ! Call solver
 
   call call_algencan(n,x,l,u,f)
 
-! Checking if this point is feasible
+  ! Checking if this point is feasible
 
   c = -1.d0
   do i = 1, nterms
@@ -223,13 +216,13 @@ do while( nrepeat < ntrials )
     cycle
   end if
 
-! Function value of this trial
+  ! Function value of this trial
 
   call func(x,f)
   write(*,"( 35a )",advance="no") (char(8),i=1,35)
   write(*,"( '# TRIAL ', i6, ' ERROR = ', e12.6 )",advance="no") it, f
 
-! If the solution is the same as before, increase nrepeat
+  ! If the solution is the same as before, increase nrepeat
 
   if ( abs(f-fbest)/n < r_precision ) then
     nrepeat = nrepeat + 1
@@ -239,7 +232,7 @@ do while( nrepeat < ntrials )
     end if
   end if
 
-! Save best solution
+  ! Save best solution
 
   if( f < fbest ) then
 
@@ -248,7 +241,7 @@ do while( nrepeat < ntrials )
       xbest(i) = x(i)
     end do
 
-! Write best point fit to the screen
+    ! Write best point fit to the screen
 
     write(*,*) ' <== BEST UP TO NOW: '
     write(*,"( '#  y = ',f14.6,'*exp( -x / ',f14.6,')' )")&
@@ -264,7 +257,7 @@ do while( nrepeat < ntrials )
       xbest(i) = x(i)
     end do
 
-! Writting output file with best point up to now
+    ! Writting output file with best point up to now
 
     open(10,file='fitexp.dat')
     write(10,"( '# fitexp output ',/,&
