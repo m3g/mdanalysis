@@ -294,6 +294,20 @@ do while( nrepeat < ntrials )
 end do
 write(*,*)
 write(*,"(a,i5,a)") "# The best solution was found ",ntrials," times."
+write(*,"(a)") '#'
+write(*,"(a)") '# Decay rates, ordered from higher to lower: '
+do i = nterms + 1, 2*nterms
+  j = i + 1
+  do while( xbest(j-1) > xbest(j) )
+    f = xbest(j-1)
+    xbest(j-1) = xbest(j)
+    xbest(j) = f
+    j = j - 1
+    if ( j == nterms ) exit
+  end do
+end do 
+write(*,"(a,3(tr2,e12.5))") '# RATES: ', (xbest(i),i=2*nterms,nterms+1,-1)
+write(*,"(a)") '#'
 write(*,"(a)") "# END. "
 
 end
