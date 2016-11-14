@@ -20,9 +20,10 @@ program fitexp
 
 use problem_data
 implicit none
-integer :: i, j, status, ntrials, it, narg, nrepeat
+integer :: i, j, icol, status, ntrials, it, narg, nrepeat, maxtrial, xcol, ycol
 double precision :: x_temp, y_temp, f, drand, seed, fbest, f_val,&
                     y0, c, c_precision, r_precision
+character(len=1) :: acol
 character(len=200) :: inputfile, record, datafile, outputfile, keyword,&
                       value
 double precision, allocatable :: x(:), g(:), l(:), u(:), xbest(:)
@@ -33,6 +34,7 @@ call version
 ! Some default parameters
 
 ntrials = 5
+maxtrial = 1000
 startat = 1
 stopat = 100000
 nterms = 1
@@ -40,12 +42,14 @@ outputfile = "fitexp.dat"
 set_bounds = .false.
 c_precision = 1.d-1
 r_precision = 1.d-10
+xcol = 1
+ycol = 2
 
 ! Check arguments
 
 narg = iargc()
-if ( narg /= 1 .and. narg /= 2 ) then
-  write(*,*) ' Run with: fitexp input.inp [data.dat] '
+if ( narg < 1 .or. narg > 3 ) then
+  write(*,*) ' Run with: fitexp input.inp [data.dat] [output.dat] '
   stop
 end if
 
@@ -61,7 +65,7 @@ do
     case ("data")
       datafile = value(record)
     case ("output")
-      outputfile = keyword(record)
+      outputfile = value(record)
     case ("startat")
       record = value(record)
       read(record,*) startat
@@ -74,6 +78,15 @@ do
     case ("n_trials")
       record = value(record)
       read(record,*) ntrials
+    case ("max_trials")
+      record = value(record)
+      read(record,*) maxtrial
+    case ("xcol")
+      record = value(record)
+      read(record,*) xcol
+    case ("ycol")
+      record = value(record)
+      read(record,*) ycol
     case ("linear_term_precision")
       record = value(record)
       read(record,*) c_precision
@@ -90,9 +103,16 @@ end do
 
 ! Read data file from the command line
 
-if ( narg == 2 ) then
+if ( narg > 1 ) then
   call getarg(2,record)
   datafile = record
+end if
+
+! Read output file from command line
+
+if ( narg > 2 ) then
+  call getarg(3,record)
+  outputfile = record
 end if
 
 ! Number of variables
@@ -154,7 +174,9 @@ do
   read(10,"( a200 )",iostat=status) record
   if(status /= 0) exit
   if(record(1:1) == "#") cycle
-  read(record,*,iostat=status) x_temp, y_temp
+  read(record,*,iostat=status) (acol,icol=1,xcol-1), x_temp
+  if(status /= 0) cycle 
+  read(record,*,iostat=status) (acol,icol=1,ycol-1), y_temp
   if(status /= 0) cycle 
   if( x_temp >= startat .and. &
       x_temp <= stopat ) then 
@@ -162,6 +184,14 @@ do
     if ( ndata == 1 ) y0 = y_temp
   end if
 end do
+write(*,"(a,i4)") "# Read X values from column: ", xcol
+write(*,"(a,i4)") "# Read Y values from column: ", ycol
+write(*,"(a,i10)") "# Number of data points: ", ndata
+if ( ndata < 3 ) then
+  write(*,*) ' ERROR: Number of data points read = ', ndata
+  close(10)
+  stop
+end if
 rewind(10)
 
 ! Allocate arrays and read data into them
@@ -172,7 +202,9 @@ do
   read(10,"( a200 )",iostat=status) record
   if(status /= 0) exit
   if(record(1:1) == "#") cycle
-  read(record,*,iostat=status) x_temp, y_temp
+  read(record,*,iostat=status) (acol,icol=1,xcol-1), x_temp
+  if(status /= 0) cycle 
+  read(record,*,iostat=status) (acol,icol=1,ycol-1), y_temp
   if(status /= 0) cycle 
   if( x_temp >= startat .and. &
       x_temp <= stopat ) then 
@@ -191,7 +223,7 @@ seed = 1.825242d0
 fbest = 1.d20
 nrepeat = 0
 it = 0 
-do while( nrepeat < ntrials )
+do while( nrepeat < ntrials .and. it <= maxtrial )
   it = it + 1
 
   ! Random initial point of this trial
@@ -259,7 +291,7 @@ do while( nrepeat < ntrials )
 
     ! Writting output file with best point up to now
 
-    open(10,file='fitexp.dat')
+    open(10,file=outputfile)
     write(10,"( '# fitexp output ',/,&
               &'# Data file: ', a,/,&
               &'# Start at: ',d14.6,/,& 
@@ -299,14 +331,22 @@ write(*,"(a)") '# Decay rates, ordered from higher to lower: '
 do i = nterms + 1, 2*nterms-1
   j = i + 1
   do while( xbest(j-1) > xbest(j) )
+    ! Rates (used for sorting)
     f = xbest(j-1)
     xbest(j-1) = xbest(j)
     xbest(j) = f
+    ! fractions
+    f = xbest(j-1-nterms)
+    xbest(j-1-nterms) = xbest(j-nterms)
+    xbest(j-nterms) = f
     j = j - 1
     if ( j == nterms+1 ) exit
   end do
 end do 
-write(*,"(a,3(tr2,f14.6))") '# RATES: ', (1.d0/xbest(i),i=nterms+1,2*nterms)
+write(*,"(a,3(tr2,f14.6))") '#   RATES: ', (1.d0/xbest(i),i=nterms+1,2*nterms)
+write(*,"(a,3(tr2,f14.6))") '# WEIGHTS: ', (xbest(i),i=1,nterms)
+write(*,"(a)") '#'
+write(*,"(a,a)") '# Wrote output file: ', trim(adjustl(outputfile))
 write(*,"(a)") '#'
 write(*,"(a)") "# END. "
 

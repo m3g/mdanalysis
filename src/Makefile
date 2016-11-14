@@ -34,7 +34,8 @@ SCR=../scripts
 # Base directory of instalation (do not change this)
 IDIR=$(shell dirname `pwd`)
 
-all : $(BIN)/energy \
+all : $(BIN) $(OBJ) \
+      $(BIN)/energy \
       $(BIN)/align \
       $(BIN)/distance \
       $(BIN)/solvation \
@@ -50,7 +51,17 @@ all : $(BIN)/energy \
       $(BIN)/perresidueavg \
       $(BIN)/lifetime \
       $(BIN)/gssfree \
-      warning $(BIN) $(OBJ)
+      warning
+
+#
+# Building directories
+#
+
+$(BIN) : 
+	mkdir -p $(BIN)
+
+$(OBJ) : 
+	mkdir -p $(OBJ)
 
 #
 # energy module
@@ -260,18 +271,11 @@ $(OBJ)/gssfree.o : $(SRC)/gssfree.f90
 # This is common for all packages
 #
 
-$(OBJ)/common.o : $(SRC)/common.f90 $(BIN) $(OBJ)
+$(OBJ)/common.o : $(SRC)/common.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/common.o $(SRC)/common.f90
 
-$(OBJ)/version.o : $(SRC)/version.f90 $(BIN) $(OBJ)
+$(OBJ)/version.o : $(SRC)/version.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/version.o $(SRC)/version.f90
-
-$(BIN) : 
-	mkdir -p $(BIN)
-
-$(OBJ) : 
-	mkdir -p $(OBJ)
-
 
 warning : 
 
@@ -284,8 +288,8 @@ warning :
 
 
 clean :
-	rm -f $(OBJ)/* 
-	rm -f $(BIN)/* 
+	\rm -rf ../obj 
+	\rm -rf ../bin
 	rm -f ./*.mod
 
 

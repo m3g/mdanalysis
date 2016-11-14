@@ -23,6 +23,13 @@ n_exp_terms 2
 # Trials with identical best solutions to quit
 n_trials 5
 
+# Maximum number of trials
+max_trials 1000
+
+# Columns containing x and y values
+xcol 1
+ycol 2
+
 # Precision with which the sum of the linear terms must be 1.d0
 linear_term_precision 0.1
 
