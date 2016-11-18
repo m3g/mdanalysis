@@ -25,7 +25,7 @@
 ! L. Martinez, Institute of Chemistry, State University of Campinas
 !              Mar 5, 2009. leandromartinez98@gmail.com
 !
-! Version 16.323
+! Version 16.323.2
 !
 
 program jarzynski

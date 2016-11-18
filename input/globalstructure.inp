@@ -1,7 +1,7 @@
 #
 # Globalstructure input file example
 #
-# Version 16.323
+# Version 16.323.2
 #
 pdbfile     system.pdb
 dcdfile     system.dcd
