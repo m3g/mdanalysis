@@ -3,7 +3,7 @@
 subroutine version()
   
   write(*,*) 
-  write(*,*) ' Version 16.146 '
+  write(*,*) ' Version 16.323
   write(*,*) 
 
   return 

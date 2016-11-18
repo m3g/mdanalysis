@@ -42,28 +42,28 @@ echo "Will create file: $file"
 
 for file in `ls ./*`; do
   if [ $file == "./$package/src/common.f90" ] ; then
-    sed -e "s/' Version.*/' Version $version '/" $file > $file.temp
+    sed -e "s/' Version 16.323
     \mv -f $file.temp $file
-    sed -e "s/! Version.*/! Version $version/" $file > $file.temp
+    sed -e "s/! Version 16.323
     \mv -f $file.temp $file
   elif [ $file == "./$package/src/algencan-pocket.f" ]; then
-    sed -e "s/lm-Version.*/lm-Version $version/" $file > $file.temp
+    sed -e "s/lm-Version 16.323
     \mv -f $file.temp $file
   else
-    sed -e "s/Version.*/Version $version/" $file > $file.temp
+    sed -e "s/Version 16.323
     \mv -f $file.temp $file
   fi
 done
 for file in `ls ../scripts/*`; do
-  sed -e "s/Version.*/Version $version/" $file > $file.temp
+  sed -e "s/Version 16.323
   \mv -f $file.temp $file
 done
 for file in `ls ../input/*`; do
-  sed -e "s/Version.*/Version $version/" $file > $file.temp
+  sed -e "s/Version 16.323
   \mv -f $file.temp $file
 done
 file=./Makefile
-sed -e "s/Version.*/Version $version/" $file > $file.temp
+sed -e "s/Version 16.323
 \mv -f $file.temp $file
 
 git add -A .
