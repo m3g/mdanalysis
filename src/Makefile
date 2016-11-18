@@ -248,10 +248,10 @@ $(OBJ)/lifetime.o : $(SRC)/lifetime.f90
 
 #
 # gssfree program
-#
+# 
 
-$(BIN)/gssfree : $(OBJ)/gssfree.o
-	$(FORTRAN) $(FLAGS) -o $(BIN)/gssfree $(OBJ)/gssfree.o
+$(BIN)/gssfree : $(OBJ)/gssfree.o $(OBJ)/common.o
+	$(FORTRAN) $(FLAGS) -o $(BIN)/gssfree $(OBJ)/gssfree.o $(OBJ)/common.o
 
 $(OBJ)/gssfree.o : $(SRC)/gssfree.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/gssfree.o $(SRC)/gssfree.f90
@@ -263,6 +263,11 @@ $(OBJ)/gssfree.o : $(SRC)/gssfree.f90
 $(OBJ)/common.o : $(SRC)/common.f90 
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/common.o $(SRC)/common.f90
 
+
+$(OBJ) :
+      mkdir -p ../obj
+$(BIN) :
+      mkdir -p ../bin
 
 warning : 
 
