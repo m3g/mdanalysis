@@ -1,5 +1,5 @@
 C
-C lm-Version 16.323
+C lm-Version 16.146
 C
 C     ******************************************************************
 C     ******************************************************************
@@ -18505,7 +18505,7 @@ C           density of rows regarded as dense by the MC50 and MA27
 C           orderings.
 C 24/05/04  Statment functions in MA57U/UD replaced by in-line code.
 
-C 12th July 2004 Version 16.323
+C 12th July 2004 Version 1.0.0. Version numbering added.
 
 C 20/07/04  Several changes incorporated for HSL 2004 code.
 C           Removed unused INT,ABS from MA57U/UD
@@ -18518,15 +18518,15 @@ C           Scaling using symmetrized MC64 (ICNTL(15))
 C           Links to METIS_NODEND ordering
 
 
-C 31st July 2004 Version 16.323
+C 31st July 2004 Version 2.0.0 established at HSL 2004 release.
 
-C 1st Sept  2004 Version 16.323
-C 10th Sept 2004 Version 16.323
+C 1st Sept  2004 Version 2.1.0. Default changed to static pivoting off.
+C 10th Sept 2004 Version 2.2.0. Defaults for ICNTL(6), ICNTL(9) and
 C           CNTL(5) changed. Scaling factors (optionally) printed.
-C  4th Nov  2004 Version 16.323
+C  4th Nov  2004 Version 2.2.1. Change to assembly of reals in MA57O/OD
 C           leading to more efficient code at suggestion of Stephane
 C           Pralet.
-C 13th Dec  2004 Version 16.323
+C 13th Dec  2004 Version 2.3.0. Several minor changes after field
 C           testing.
 C           Scale factors (RINFO(16) and RINFO(17) set to 1
 C           if scaling not used.
@@ -18536,7 +18536,7 @@ C           work on matrix with a rows of zeros.
 C           Some diagnostic printing and STOP statements removed from
 C           MC50.
 
-C 2nd March 2005  Version 16.323
+C 2nd March 2005  Version 3.0.0.  A new option has been added for
 C           ordering the matrix.  If ICNTL(6) is equal to 5 then the
 C           ordering chosen depends on the matrix characteristics.
 C           At the moment the choices are MC50 or METIS.
@@ -18544,18 +18544,18 @@ C           INFO(36) is set to ordering used.
 C           A minor chnage has been made to the pivot control to reduce
 C           the amount of researching on failed pivots (resetting of
 C           KR). FD05 dependence changed to FD15.
-C 15th June 2005  Version 16.323
+C 15th June 2005  Version 3.0.1.  Setting of ALENB in MA57B/BD moved
 C           before first error exit to avoid undefined variable
 C           if error invoked.  INFO(1) initialized to zero in call to
 C           MA57C/CD.
-C 1 December 2006. Version 16.323
+C 1 December 2006. Version 3.0.2. Comments adjusted to meet the
 C           72-character limit.
 
-C 3 August 2007  Version 16.323
+C 3 August 2007  Version 3.1.0.
 C           The new version of MC47 (that incorporates an updated
 C           version of MC50 is used).
 
-C 19 September 2007  Version 16.323
+C 19 September 2007  Version 3.2.0
 C           New option added (ICNTL(16)) that allows the removal of
 C           blocks of small entries to the end of the factorization.
 C           Is particularly powerful when matrix is severely rank
@@ -23118,14 +23118,14 @@ C Original date 30 November 1995
 C  April 2001: call to MC49 changed to MC59 to make routine threadsafe
 C 20/2/02 Cosmetic changes applied to reduce single/double differences
 
-C 12th July 2004 Version 16.323
-C 23 May 2007 Version 16.323
+C 12th July 2004 Version 1.0.0. Version numbering added.
+C 23 May 2007 Version 1.1.0. Absolute value of hash taken to cover the
 C            case of integer overflow.
 C            Comments with character in column 2 corrected.
-C 2 August 2007 Version 16.323
+C 2 August 2007 Version 2.0.0 Dense row handling added, error & warning
 C            messages added, iovflo added, interface changed. MC47I/ID
 C            added.
-C 31 October 2007 Version 16.323
+C 31 October 2007 Version 2.1.0 Corrected tree formation when handling
 C            full variables
 C
 
@@ -24212,7 +24212,7 @@ C Original date 14 June 2001
 C  June 2001: threadsafe version of MC41
 C 20/2/02 Cosmetic changes applied to reduce single/double differences
 
-C 12th July 2004 Version 16.323
+C 12th July 2004 Version 1.0.0. Version numbering added.
 
       SUBROUTINE MC71AD(N,KASE,X,EST,W,IW,KEEP)
       INTEGER ITMAX
@@ -24371,7 +24371,7 @@ C 12th July 2004 Version 16.323
 C       Toolpack tool decs employed.
 C 20/2/02 Cosmetic changes applied to reduce single/double differences
 
-C 12th July 2004 Version 16.323
+C 12th July 2004 Version 1.0.0. Version numbering added.
 
       SUBROUTINE MC34AD(N,IRN,JCOLST,YESA,A,IW)
       INTEGER N
@@ -24475,8 +24475,8 @@ C 12th July 2004 Version 16.323
 C Original date 29 Jan 2001
 C 29 January 2001. Modified from MC49 to be threadsafe.
 
-C 12th July 2004 Version 16.323
-C 28 February 2008. Version 16.323
+C 12th July 2004 Version 1.0.0. Version numbering added.
+C 28 February 2008. Version 1.0.1. Comments flowed to column 72.
 
       SUBROUTINE MC59AD(ICNTL,NC,NR,NE,IRN,LJCN,JCN,LA,A,LIP,IP,
      &                  LIW,IW,INFO)
@@ -25233,17 +25233,17 @@ CCCCC PACKAGE MC64A/AD
 CCCCC AUTHORS Iain Duff (i.duff@rl.ac.uk) and
 CCCCC         Jacko Koster (jacko.koster@uninett.no)
 
-C 12th July 2004 Version 16.323
+C 12th July 2004 Version 1.0.0. Version numbering added.
 
-C 30/07/04  Version 16.323
+C 30/07/04  Version 1.1.0. Permutation array flagged negative to
 C           indicate dependent columns in singular case.  Calls to
 C           MC64F/FD changed to avoid unsafe reference to array L.
-C 21st February 2005 Version 16.323
-C  7th March 2005 Version 16.323
+C 21st February 2005 Version 1.2.0. FD05 dependence changed to FD15.
+C  7th March 2005 Version 1.3.0. Scan of dense columns avoided in
 C           the cheap assignment phase in MC64W/WD.
-C 15th May 2007 Version 16.323
+C 15th May 2007 Version 1.4.0. Minor change made in MC64W/WD to avoid
 C           crash when the input array contains NaNs.
-C 28th June 2007  Version 16.323
+C 28th June 2007  Version 1.5.0. Permutation array flagged negative to
 C           indicate dependent columns in singular case for all values
 C           of the JOB parameter (previously was only for JOB 4 and 5).
 C           Also some very minor changes concerning tests in DO loops
@@ -26518,7 +26518,7 @@ C######8/10/92 Toolpack tool decs employed.
 C######8/10/92 D version created by name change only.
 C 13/3/02 Cosmetic changes applied to reduce single/double differences
 C
-C 12th July 2004 Version 16.323
+C 12th July 2004 Version 1.0.0. Version numbering added.
 
       SUBROUTINE MC21AD(N,ICN,LICN,IP,LENR,IPERM,NUMNZ,IW)
       INTEGER LICN,N,NUMNZ
@@ -26611,7 +26611,7 @@ C 12th July 2004 Version 16.323
 * COPYRIGHT (c) 1988 AEA Technology
 * Original date 17 Feb 2005
 
-C 17th February 2005 Version 16.323
+C 17th February 2005 Version 1.0.0. Replacement for FD05.
 
       DOUBLE PRECISION FUNCTION FD15AD(T)
 C----------------------------------------------------------------

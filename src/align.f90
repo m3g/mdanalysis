@@ -27,7 +27,7 @@
 !       i_residue: Array containing the sequential numbers of the 
 !                  different residues
 !
-! Version 16.323.2
+! Version 16.146
 !
 
 ! Static variables

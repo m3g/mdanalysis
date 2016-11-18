@@ -9,7 +9,7 @@
 # If you want to compile with some specific fortran compiler, you 
 # must change the line below to the path of your fortran compiler. 
 #
-# Version 16.323.2
+# Version 16.146
 #
 FORTRAN = gfortran
 #FORTRAN = ifort
@@ -34,8 +34,7 @@ SCR=../scripts
 # Base directory of instalation (do not change this)
 IDIR=$(shell dirname `pwd`)
 
-all : $(BIN) $(OBJ) \
-      $(BIN)/energy \
+all : $(BIN)/energy \
       $(BIN)/align \
       $(BIN)/distance \
       $(BIN)/solvation \
@@ -54,21 +53,11 @@ all : $(BIN) $(OBJ) \
       warning
 
 #
-# Building directories
-#
-
-$(BIN) : 
-	mkdir -p $(BIN)
-
-$(OBJ) : 
-	mkdir -p $(OBJ)
-
-#
 # energy module
 #
 
-$(BIN)/energy : $(OBJ)/common.o $(OBJ)/version.o $(OBJ)/energy.o $(BIN)/energy.sh
-	$(FORTRAN) $(FLAGS) -o $(BIN)/energy $(OBJ)/energy.o $(OBJ)/common.o $(OBJ)/version.o
+$(BIN)/energy : $(OBJ)/common.o $(OBJ)/energy.o $(BIN)/energy.sh
+	$(FORTRAN) $(FLAGS) -o $(BIN)/energy $(OBJ)/energy.o $(OBJ)/common.o
 
 $(OBJ)/energy.o : $(SRC)/energy.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/energy.o $(SRC)/energy.f90
@@ -82,8 +71,8 @@ $(BIN)/energy.sh : $(SCR)/energy-base.sh
 # align module
 #
 
-$(BIN)/align : $(OBJ)/common.o $(OBJ)/version.o $(OBJ)/align.o $(BIN)/align.sh
-	$(FORTRAN) $(FLAGS) -o $(BIN)/align $(OBJ)/align.o $(OBJ)/common.o $(OBJ)/version.o
+$(BIN)/align : $(OBJ)/common.o $(OBJ)/align.o $(BIN)/align.sh
+	$(FORTRAN) $(FLAGS) -o $(BIN)/align $(OBJ)/align.o $(OBJ)/common.o
 
 $(OBJ)/align.o : $(SRC)/align.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/align.o $(SRC)/align.f90
@@ -97,8 +86,8 @@ $(BIN)/align.sh : $(SCR)/align-base.sh
 # distance module
 #
 
-$(BIN)/distance : $(OBJ)/common.o $(OBJ)/version.o $(OBJ)/distance.o $(BIN)/distance.sh
-	$(FORTRAN) $(FLAGS) -o $(BIN)/distance $(OBJ)/distance.o $(OBJ)/common.o $(OBJ)/version.o
+$(BIN)/distance : $(OBJ)/common.o $(OBJ)/distance.o $(BIN)/distance.sh
+	$(FORTRAN) $(FLAGS) -o $(BIN)/distance $(OBJ)/distance.o $(OBJ)/common.o
 
 $(OBJ)/distance.o : $(SRC)/distance.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/distance.o $(SRC)/distance.f90
@@ -111,8 +100,8 @@ $(BIN)/distance.sh : $(SCR)/distance-base.sh
 # solvation module
 #
 
-$(BIN)/solvation : $(OBJ)/common.o $(OBJ)/version.o $(OBJ)/solvation.o $(BIN)/solvation.sh
-	$(FORTRAN) $(FLAGS) -o $(BIN)/solvation $(OBJ)/solvation.o $(OBJ)/common.o $(OBJ)/version.o
+$(BIN)/solvation : $(OBJ)/common.o $(OBJ)/solvation.o $(BIN)/solvation.sh
+	$(FORTRAN) $(FLAGS) -o $(BIN)/solvation $(OBJ)/solvation.o $(OBJ)/common.o
 
 $(OBJ)/solvation.o : $(SRC)/solvation.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/solvation.o $(SRC)/solvation.f90
@@ -125,8 +114,8 @@ $(BIN)/solvation.sh : $(SCR)/solvation-base.sh
 # gss module
 #
 
-$(BIN)/gss : $(OBJ)/smalldistances.o $(OBJ)/common.o $(OBJ)/version.o $(OBJ)/gss.o $(BIN)/gss.sh
-	$(FORTRAN) $(FLAGS) -o $(BIN)/gss $(OBJ)/gss.o $(OBJ)/common.o $(OBJ)/version.o $(OBJ)/smalldistances.o
+$(BIN)/gss : $(OBJ)/smalldistances.o $(OBJ)/common.o $(OBJ)/gss.o $(BIN)/gss.sh
+	$(FORTRAN) $(FLAGS) -o $(BIN)/gss $(OBJ)/gss.o $(OBJ)/common.o $(OBJ)/smalldistances.o
 
 $(OBJ)/gss.o : $(SRC)/gss.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/gss.o $(SRC)/gss.f90
@@ -142,8 +131,8 @@ $(OBJ)/smalldistances.o : $(SRC)/smalldistances.f90
 # gss_maxmin module
 #
 
-$(BIN)/gss_maxmin : $(OBJ)/common.o $(OBJ)/version.o $(OBJ)/gss_maxmin.o $(BIN)/gss_maxmin.sh
-	$(FORTRAN) $(FLAGS) -o $(BIN)/gss_maxmin $(OBJ)/gss_maxmin.o $(OBJ)/common.o $(OBJ)/version.o
+$(BIN)/gss_maxmin : $(OBJ)/common.o $(OBJ)/gss_maxmin.o $(BIN)/gss_maxmin.sh
+	$(FORTRAN) $(FLAGS) -o $(BIN)/gss_maxmin $(OBJ)/gss_maxmin.o $(OBJ)/common.o
 
 $(OBJ)/gss_maxmin.o : $(SRC)/gss_maxmin.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/gss_maxmin.o $(SRC)/gss_maxmin.f90
@@ -156,8 +145,8 @@ $(BIN)/gss_maxmin.sh : $(SCR)/gss_maxmin-base.sh
 # angles module
 #
 
-$(BIN)/angles : $(OBJ)/common.o $(OBJ)/version.o $(OBJ)/angles.o $(BIN)/angles.sh
-	$(FORTRAN) $(FLAGS) -o $(BIN)/angles $(OBJ)/angles.o $(OBJ)/common.o $(OBJ)/version.o
+$(BIN)/angles : $(OBJ)/common.o $(OBJ)/angles.o $(BIN)/angles.sh
+	$(FORTRAN) $(FLAGS) -o $(BIN)/angles $(OBJ)/angles.o $(OBJ)/common.o
 
 $(OBJ)/angles.o : $(SRC)/angles.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/angles.o $(SRC)/angles.f90
@@ -171,8 +160,8 @@ $(BIN)/angles.sh : $(SCR)/angles-base.sh
 # hbonds module
 #
 
-$(BIN)/hbonds : $(OBJ)/common.o $(OBJ)/version.o $(OBJ)/hbonds.o $(BIN)/hbonds.sh
-	$(FORTRAN) $(FLAGS) -o $(BIN)/hbonds $(OBJ)/hbonds.o $(OBJ)/common.o $(OBJ)/version.o
+$(BIN)/hbonds : $(OBJ)/common.o $(OBJ)/hbonds.o $(BIN)/hbonds.sh
+	$(FORTRAN) $(FLAGS) -o $(BIN)/hbonds $(OBJ)/hbonds.o $(OBJ)/common.o
 
 $(OBJ)/hbonds.o : $(SRC)/hbonds.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/hbonds.o $(SRC)/hbonds.f90
@@ -185,8 +174,8 @@ $(BIN)/hbonds.sh : $(SCR)/hbonds-base.sh
 # globalstructure module
 #
 
-$(BIN)/globalstructure : $(OBJ)/globalstructure.o $(OBJ)/common.o $(OBJ)/version.o
-	$(FORTRAN) $(FLAGS) -o $(BIN)/globalstructure $(OBJ)/globalstructure.o $(OBJ)/common.o $(OBJ)/version.o -llapack
+$(BIN)/globalstructure : $(OBJ)/globalstructure.o $(OBJ)/common.o
+	$(FORTRAN) $(FLAGS) -o $(BIN)/globalstructure $(OBJ)/globalstructure.o $(OBJ)/common.o -llapack
 
 $(OBJ)/globalstructure.o : $(SRC)/globalstructure.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/globalstructure.o $(SRC)/globalstructure.f90
@@ -195,8 +184,8 @@ $(OBJ)/globalstructure.o : $(SRC)/globalstructure.f90
 # jarzynski module
 #
 
-$(BIN)/jarzynski : $(OBJ)/common.o $(OBJ)/version.o $(OBJ)/jarzynski.o
-	$(FORTRAN) $(FLAGS) -o $(BIN)/jarzynski $(OBJ)/jarzynski.o $(OBJ)/common.o $(OBJ)/version.o
+$(BIN)/jarzynski : $(OBJ)/common.o $(OBJ)/jarzynski.o
+	$(FORTRAN) $(FLAGS) -o $(BIN)/jarzynski $(OBJ)/jarzynski.o $(OBJ)/common.o
 
 $(OBJ)/jarzynski.o : $(SRC)/jarzynski.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/jarzynski.o $(SRC)/jarzynski.f90
@@ -205,8 +194,8 @@ $(OBJ)/jarzynski.o : $(SRC)/jarzynski.f90
 # time correlation function module
 #
 
-$(BIN)/tcf : $(OBJ)/common.o $(OBJ)/version.o $(OBJ)/tcf.o
-	$(FORTRAN) $(FLAGS) -o $(BIN)/tcf $(OBJ)/tcf.o $(OBJ)/common.o $(OBJ)/version.o
+$(BIN)/tcf : $(OBJ)/common.o $(OBJ)/tcf.o
+	$(FORTRAN) $(FLAGS) -o $(BIN)/tcf $(OBJ)/tcf.o $(OBJ)/common.o
 
 $(OBJ)/tcf.o : $(SRC)/tcf.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/tcf.o $(SRC)/tcf.f90
@@ -216,9 +205,9 @@ $(OBJ)/tcf.o : $(SRC)/tcf.f90
 # fitexp module
 #
 
-$(BIN)/fitexp : $(OBJ)/common.o $(OBJ)/version.o $(OBJ)/fitexp.o $(OBJ)/algencan-pocket.o
+$(BIN)/fitexp : $(OBJ)/common.o $(OBJ)/fitexp.o $(OBJ)/algencan-pocket.o
 	$(FORTRAN) $(FLAGS) -o $(BIN)/fitexp $(OBJ)/fitexp.o \
-                                           $(OBJ)/common.o $(OBJ)/version.o \
+                                           $(OBJ)/common.o \
                                            $(OBJ)/algencan-pocket.o
 
 $(OBJ)/fitexp.o : $(SRC)/fitexp.f90
@@ -231,8 +220,8 @@ $(OBJ)/algencan-pocket.o : $(SRC)/algencan-pocket.f
 # histogram program
 #
 
-$(BIN)/histogram : $(OBJ)/histogram.o $(OBJ)/common.o $(OBJ)/version.o
-	$(FORTRAN) $(FLAGS) -o $(BIN)/histogram $(OBJ)/histogram.o $(OBJ)/common.o $(OBJ)/version.o
+$(BIN)/histogram : $(OBJ)/histogram.o
+	$(FORTRAN) $(FLAGS) -o $(BIN)/histogram $(OBJ)/histogram.o $(OBJ)/common.o
 
 $(OBJ)/histogram.o : $(SRC)/histogram.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/histogram.o $(SRC)/histogram.f90
@@ -271,11 +260,9 @@ $(OBJ)/gssfree.o : $(SRC)/gssfree.f90
 # This is common for all packages
 #
 
-$(OBJ)/common.o : $(SRC)/common.f90
+$(OBJ)/common.o : $(SRC)/common.f90 
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/common.o $(SRC)/common.f90
 
-$(OBJ)/version.o : $(SRC)/version.f90
-	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/version.o $(SRC)/version.f90
 
 warning : 
 
@@ -288,8 +275,8 @@ warning :
 
 
 clean :
-	\rm -rf ../obj 
-	\rm -rf ../bin
+	rm -f $(OBJ)/* 
+	rm -f $(BIN)/* 
 	rm -f ./*.mod
 
 

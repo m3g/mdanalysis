@@ -1,7 +1,7 @@
 #
 # Example input file for solvation.f90
 #
-# Version 16.323.2
+# Version 16.146
 #
 
 psf /home/leandro/Documents/tcf/ppar/ppar+rosi/0/structures/ppar+rosi.psf 

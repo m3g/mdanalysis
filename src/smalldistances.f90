@@ -5,7 +5,7 @@
 !
 ! L. Martinez, Sep 23, 2014.
 !
-! Version 16.323.2
+! Version 16.146
 !
 
 module linkedcells_smalldistances 

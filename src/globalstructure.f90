@@ -61,7 +61,7 @@
 ! 
 !  Leandro Martinez, IQ-UNICAMP, June 15, 2007
 !
-!  Version 16.323.2
+!  Version 16.146
 !
 
 program globalstructure
@@ -396,16 +396,18 @@ program globalstructure
   do i = 1, natom
     nc(i) = 0
   end do
-  do i = 1, natom - 1
-    do j = i + 3, natom
-      d = sqrt((aref(i,1)-aref(j,1))**2 + (aref(i,2)-aref(j,2))**2 + (aref(i,3)-aref(j,3))**2)
-      if(d.lt.dcon) then
-        nc(i) = nc(i) + 1
-        if ( nc(i) .gt. maxcontact ) then 
-          write(*,*) ' ERROR: Number of contacts > maxcontact '
-          stop
+  do i = 1, natom
+    do j = 1, natom
+      if (abs(i-j).gt.3) then
+        d = sqrt((aref(i,1)-aref(j,1))**2 + (aref(i,2)-aref(j,2))**2 + (aref(i,3)-aref(j,3))**2)
+        if(d.lt.dcon) then
+          nc(i) = nc(i) + 1
+          if ( nc(i) .gt. maxcontact ) then 
+            write(*,*) ' ERROR: Number of contacts > maxcontact '
+            stop
+          end if
+          contact(i,nc(i)) = j
         end if
-        contact(i,nc(i)) = j
       end if
     end do
   end do

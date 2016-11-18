@@ -1,5 +1,5 @@
 !
-! Version 16.323.2
+! Version 16.146
 !
 !
 ! Module containing the problem data
@@ -20,10 +20,9 @@ program fitexp
 
 use problem_data
 implicit none
-integer :: i, j, icol, status, ntrials, it, narg, nrepeat, maxtrial, xcol, ycol
+integer :: i, j, status, ntrials, it
 double precision :: x_temp, y_temp, f, drand, seed, fbest, f_val,&
-                    y0, c, c_precision, r_precision
-character(len=1) :: acol
+                    x_scale, y_scale, c, c_precision
 character(len=200) :: inputfile, record, datafile, outputfile, keyword,&
                       value
 double precision, allocatable :: x(:), g(:), l(:), u(:), xbest(:)
@@ -33,25 +32,15 @@ call version
 
 ! Some default parameters
 
-ntrials = 5
-maxtrial = 1000
+ntrials = 10
+x_scale = 1.d0
+y_scale = 1.d0
 startat = 1
 stopat = 100000
 nterms = 1
 outputfile = "fitexp.dat"
 set_bounds = .false.
 c_precision = 1.d-1
-r_precision = 1.d-10
-xcol = 1
-ycol = 2
-
-! Check arguments
-
-narg = iargc()
-if ( narg < 1 .or. narg > 3 ) then
-  write(*,*) ' Run with: fitexp input.inp [data.dat] [output.dat] '
-  stop
-end if
 
 ! Reading input file
 
@@ -65,7 +54,7 @@ do
     case ("data")
       datafile = value(record)
     case ("output")
-      outputfile = value(record)
+      outputfile = keyword(record)
     case ("startat")
       record = value(record)
       read(record,*) startat
@@ -78,15 +67,12 @@ do
     case ("n_trials")
       record = value(record)
       read(record,*) ntrials
-    case ("max_trials")
+    case ("x_scale")
       record = value(record)
-      read(record,*) maxtrial
-    case ("xcol")
+      read(record,*) x_scale
+    case ("y_scale")
       record = value(record)
-      read(record,*) xcol
-    case ("ycol")
-      record = value(record)
-      read(record,*) ycol
+      read(record,*) y_scale
     case ("linear_term_precision")
       record = value(record)
       read(record,*) c_precision
@@ -100,20 +86,6 @@ do
       stop
   end select
 end do
-
-! Read data file from the command line
-
-if ( narg > 1 ) then
-  call getarg(2,record)
-  datafile = record
-end if
-
-! Read output file from command line
-
-if ( narg > 2 ) then
-  call getarg(3,record)
-  outputfile = record
-end if
 
 ! Number of variables
 
@@ -174,24 +146,13 @@ do
   read(10,"( a200 )",iostat=status) record
   if(status /= 0) exit
   if(record(1:1) == "#") cycle
-  read(record,*,iostat=status) (acol,icol=1,xcol-1), x_temp
-  if(status /= 0) cycle 
-  read(record,*,iostat=status) (acol,icol=1,ycol-1), y_temp
+  read(record,*,iostat=status) x_temp, y_temp
   if(status /= 0) cycle 
   if( x_temp >= startat .and. &
       x_temp <= stopat ) then 
     ndata = ndata + 1
-    if ( ndata == 1 ) y0 = y_temp
   end if
 end do
-write(*,"(a,i4)") "# Read X values from column: ", xcol
-write(*,"(a,i4)") "# Read Y values from column: ", ycol
-write(*,"(a,i10)") "# Number of data points: ", ndata
-if ( ndata < 3 ) then
-  write(*,*) ' ERROR: Number of data points read = ', ndata
-  close(10)
-  stop
-end if
 rewind(10)
 
 ! Allocate arrays and read data into them
@@ -202,69 +163,54 @@ do
   read(10,"( a200 )",iostat=status) record
   if(status /= 0) exit
   if(record(1:1) == "#") cycle
-  read(record,*,iostat=status) (acol,icol=1,xcol-1), x_temp
-  if(status /= 0) cycle 
-  read(record,*,iostat=status) (acol,icol=1,ycol-1), y_temp
+  read(record,*,iostat=status) x_temp, y_temp
   if(status /= 0) cycle 
   if( x_temp >= startat .and. &
       x_temp <= stopat ) then 
     ndata = ndata + 1
-    xdata(ndata) = x_temp
-    ydata(ndata) = y_temp / y0
+    xdata(ndata) = x_temp * x_scale
+    ydata(ndata) = y_temp * y_scale
   end if
 end do
 write(*,"( '# Number of data points: ',i8 )") ndata
 close(10)
-write(*,"( '#',/,'#',55('-'),/,35('-') )",advance="no")
+write(*,"( '#',/,'#',55('-') )")
 
 ! Running optimization
 
 seed = 1.825242d0
 fbest = 1.d20
-nrepeat = 0
-it = 0 
-do while( nrepeat < ntrials .and. it <= maxtrial )
-  it = it + 1
+do it = 1, ntrials
 
-  ! Random initial point of this trial
+! Random initial point of this trial
 
   do i = 1, n
     x(i) = l(i) + drand(seed) * ( u(i) - l(i) )
   end do
 
-  ! Call solver
+! Call solver
 
   call call_algencan(n,x,l,u,f)
 
-  ! Checking if this point is feasible
+! Checking if this point is feasible
 
   c = -1.d0
   do i = 1, nterms
     c = c + x(i)
   end do
   if ( dabs(c) > c_precision ) then
-    write(*,"( 35a )",advance="no") (char(8),i=1,35)
-    write(*,"( '# TRIAL ',i6,11(' '),'UNFEASIBLE' )",advance="no") it
+    write(*,"( 35a, '# TRIAL ',i6,11(' '),'UNFEASIBLE' )",&
+            advance="no") (char(8),i=1,35), it
     cycle
   end if
 
-  ! Function value of this trial
+! Function value of this trial
 
   call func(x,f)
-  write(*,"( 35a )",advance="no") (char(8),i=1,35)
-  write(*,"( '# TRIAL ', i6, ' ERROR = ', e12.6 )",advance="no") it, f
+  write(*,"( 35a, '# TRIAL ', i6, ' ERROR = ', e12.6 )",&
+          advance="no") (char(8),i=1,35), it, f
 
-  ! If the solution is the same as before, increase nrepeat
-
-  if ( abs(f-fbest)/n < r_precision ) then
-    nrepeat = nrepeat + 1
-  else
-    if ( f < fbest ) then
-      nrepeat = 0
-    end if
-  end if
-
-  ! Save best solution
+! Save best solution
 
   if( f < fbest ) then
 
@@ -273,7 +219,7 @@ do while( nrepeat < ntrials .and. it <= maxtrial )
       xbest(i) = x(i)
     end do
 
-    ! Write best point fit to the screen
+! Write best point fit to the screen
 
     write(*,*) ' <== BEST UP TO NOW: '
     write(*,"( '#  y = ',f14.6,'*exp( -x / ',f14.6,')' )")&
@@ -282,16 +228,16 @@ do while( nrepeat < ntrials .and. it <= maxtrial )
       write(*,"( '#',tr5'+',f14.6,'*exp( -x / ',f14.6,')' )")&
                 xbest(i), 1.d0 / xbest(nterms+i)
     end do
-    write(*,"( '#',/,'#',55('-'),/,'#',34(' ') )",advance="no")
+    write(*,"( '#',/,'#',55('-') )")
 
     fbest = f
     do i = 1, n
       xbest(i) = x(i)
     end do
 
-    ! Writting output file with best point up to now
+! Writting output file with best point up to now
 
-    open(10,file=outputfile)
+    open(10,file='fitexp.dat')
     write(10,"( '# fitexp output ',/,&
               &'# Data file: ', a,/,&
               &'# Start at: ',d14.6,/,& 
@@ -325,30 +271,6 @@ do while( nrepeat < ntrials .and. it <= maxtrial )
 
 end do
 write(*,*)
-write(*,"(a,i5,a)") "# The best solution was found ",ntrials," times."
-write(*,"(a)") '#'
-write(*,"(a)") '# Decay rates, ordered from higher to lower: '
-do i = nterms + 1, 2*nterms-1
-  j = i + 1
-  do while( xbest(j-1) > xbest(j) )
-    ! Rates (used for sorting)
-    f = xbest(j-1)
-    xbest(j-1) = xbest(j)
-    xbest(j) = f
-    ! fractions
-    f = xbest(j-1-nterms)
-    xbest(j-1-nterms) = xbest(j-nterms)
-    xbest(j-nterms) = f
-    j = j - 1
-    if ( j == nterms+1 ) exit
-  end do
-end do 
-write(*,"(a,3(tr2,f14.6))") '#   RATES: ', (1.d0/xbest(i),i=nterms+1,2*nterms)
-write(*,"(a,3(tr2,f14.6))") '# WEIGHTS: ', (xbest(i),i=1,nterms)
-write(*,"(a)") '#'
-write(*,"(a,a)") '# Wrote output file: ', trim(adjustl(outputfile))
-write(*,"(a)") '#'
-write(*,"(a)") "# END. "
 
 end
 

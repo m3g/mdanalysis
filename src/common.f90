@@ -1,5 +1,5 @@
 !
-! Version 16.323.2
+! Version 16.146
 !
 
 !
@@ -8,6 +8,17 @@
 module charsize
   integer, parameter :: charsize1 = 6
 end module charsize
+
+! Function that prints the version
+
+subroutine version()
+  
+  write(*,*) 
+  write(*,*) ' Version 16.146 '
+  write(*,*) 
+
+return 
+end subroutine version
 
 !
 ! This file contains common functions and subroutines for
