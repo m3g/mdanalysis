@@ -260,14 +260,14 @@ $(OBJ)/gssfree.o : $(SRC)/gssfree.f90
 # This is common for all packages
 #
 
-$(OBJ)/common.o : $(SRC)/common.f90 
+$(OBJ)/common.o : $(SRC)/common.f90 $(OBJ) $(BIN)
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/common.o $(SRC)/common.f90
 
 
 $(OBJ) :
-      mkdir -p ../obj
+	mkdir -p ../obj
 $(BIN) :
-      mkdir -p ../bin
+	mkdir -p ../bin
 
 warning : 
 
@@ -280,8 +280,8 @@ warning :
 
 
 clean :
-	rm -f $(OBJ)/* 
-	rm -f $(BIN)/* 
-	rm -f ./*.mod
+	\rm -rf $(OBJ)
+	\rm -rf $(BIN)
+	\rm -f ./*.mod
 
 
