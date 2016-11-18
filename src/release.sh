@@ -40,33 +40,33 @@ echo "Will create file: $file"
 # Update version number in source files
 #
 
-for file in `ls ./*`; do
-  if [ $file == "./$package/src/common.f90" ] ; then
-    sed -e "s/' Version 16.323
-    \mv -f $file.temp $file
-    sed -e "s/! Version 16.323
-    \mv -f $file.temp $file
-  elif [ $file == "./$package/src/algencan-pocket.f" ]; then
-    sed -e "s/lm-Version 16.323
-    \mv -f $file.temp $file
+for src in `ls ./*.f90`; do
+  if [ $src == "./$package/src/common.f90" ] ; then
+    sed -e "s/' Version.*/' Version $version '/" $src > $src.temp
+    \mv -f $src.temp $src
+    sed -e "s/! Version.*/! Version $version/" $src > $src.temp
+    \mv -f $src.temp $src
+  elif [ $src == "./$package/src/algencan-pocket.f" ]; then
+    sed -e "s/lm-Version.*/lm-Version $version/" $src > $src.temp
+    \mv -f $src.temp $src
   else
-    sed -e "s/Version 16.323
-    \mv -f $file.temp $file
+    sed -e "s/Version.*/Version $version/" $src > $src.temp
+    \mv -f $src.temp $src
   fi
 done
-for file in `ls ../scripts/*`; do
-  sed -e "s/Version 16.323
-  \mv -f $file.temp $file
+for src in `ls ../scripts/*`; do
+  sed -e "s/Version.*/Version $version/" $src > $src.temp
+  \mv -f $src.temp $src
 done
-for file in `ls ../input/*`; do
-  sed -e "s/Version 16.323
-  \mv -f $file.temp $file
+for src in `ls ../input/*`; do
+  sed -e "s/Version.*/Version $version/" $src > $src.temp
+  \mv -f $src.temp $src
 done
-file=./Makefile
-sed -e "s/Version 16.323
-\mv -f $file.temp $file
+src=./Makefile
+sed -e "s/Version.*/Version $version/" $src > $src.temp
+\mv -f $src.temp $src
 
-git add -A .
+git add -A
 git commit -m "Changed version file to $version"
 git tag -a $version -m "Release $version"
 git push origin master tag $version
