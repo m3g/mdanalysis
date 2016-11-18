@@ -25,8 +25,6 @@
 ! L. Martinez, Institute of Chemistry, State University of Campinas
 !              Mar 5, 2009. leandromartinez98@gmail.com
 !
-! Version 16.323.2
-!
 
 program jarzynski
 
@@ -42,7 +40,7 @@ character :: dummyc
 character(len=200) :: inputfile, line
 character(len=200), allocatable :: namdlog(:)
 
-call version
+call version()
 
 ! Getting the name of the input file from the command line
 

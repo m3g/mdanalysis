@@ -27,8 +27,6 @@
 !       i_residue: Array containing the sequential numbers of the 
 !                  different residues
 !
-! Version 16.323.2
-!
 
 ! Static variables
  
@@ -83,7 +81,7 @@ write(*,"(/,' ####################################################',&
           &/,/,&
           & ' ####################################################',/)")    
 
-call version
+call version()
 
 ! Some default parameters
 

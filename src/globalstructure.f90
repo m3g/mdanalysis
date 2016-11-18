@@ -61,8 +61,6 @@
 ! 
 !  Leandro Martinez, IQ-UNICAMP, June 15, 2007
 !
-!  Version 16.323.2
-!
 
 program globalstructure
 
@@ -81,7 +79,6 @@ program globalstructure
        aref(maxatm,3), t, dummyr, xvar(maxatm,3), &
        timestep, d, rmsd, xm, ym, zm, gyr, dcon, scaletime
   logical :: dcdunitcell, readfromdcd
-  external :: version
 
 ! Input data from input file 
 
@@ -154,7 +151,7 @@ program globalstructure
   write(*,"( '  ',52('#') )") 
   write(*,*)
 
-  call version
+  call version()
 
   write(*,*) ' PDBFILE     = ', pdbfile(1:length(pdbfile))
   write(*,*) ' DCDFILE     = ', dcdfile(1:length(dcdfile))

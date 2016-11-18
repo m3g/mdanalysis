@@ -17,8 +17,6 @@
 !       eps, sig, q, e, s, class, segat, resat, typeat, classat: total
 !               number of atoms of the system
 !
-! Version 16.323.2
-!
 
 ! Module used for linked cell method
 
@@ -85,7 +83,7 @@ program solvation
             &/,/,&
             & ' ####################################################',/)")    
   
-  call version
+  call version()
   
   ! Some default parameters
   

@@ -15,7 +15,7 @@ giturl=https://github.com/leandromartinez98/mdanalysis
 
 # Name of file containing version number
 
-versionfile=./version.f90
+versionfile=./common.f90
 
 ####################################################################################################
 
@@ -40,20 +40,9 @@ echo "Will create file: $file"
 # Update version number in source files
 #
 
-for src in `ls ./*.f90`; do
-  if [ $src == "./$package/src/common.f90" ] ; then
-    sed -e "s/' Version.*/' Version $version '/" $src > $src.temp
-    \mv -f $src.temp $src
-    sed -e "s/! Version.*/! Version $version/" $src > $src.temp
-    \mv -f $src.temp $src
-  elif [ $src == "./$package/src/algencan-pocket.f" ]; then
-    sed -e "s/lm-Version.*/lm-Version $version/" $src > $src.temp
-    \mv -f $src.temp $src
-  else
-    sed -e "s/Version.*/Version $version/" $src > $src.temp
-    \mv -f $src.temp $src
-  fi
-done
+src=$versionfile
+sed -e "s/' Version.*/' Version $version '/" $src > $src.temp
+\mv -f $src.temp $src
 for src in `ls ../scripts/*`; do
   sed -e "s/Version.*/Version $version/" $src > $src.temp
   \mv -f $src.temp $src

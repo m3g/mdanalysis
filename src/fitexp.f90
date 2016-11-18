@@ -1,7 +1,4 @@
 !
-! Version 16.323.2
-!
-!
 ! Module containing the problem data
 !
 
@@ -28,7 +25,7 @@ character(len=200) :: inputfile, record, datafile, outputfile, keyword,&
 double precision, allocatable :: x(:), g(:), l(:), u(:), xbest(:)
 logical set_bounds
 
-call version
+call version()
 
 ! Some default parameters
 

@@ -14,10 +14,9 @@ end module charsize
 subroutine version()
   
   write(*,*) 
-  write(*,*) ' Version 16.323.2
+  write(*,*) ' Version 16.323.2 '
   write(*,*) 
 
-return 
 end subroutine version
 
 !

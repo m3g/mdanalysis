@@ -39,6 +39,8 @@ program gssfree
     stop
   end if
 
+  call version()
+
   call getarg(1,file)
   call getarg(2,record)
   read(record,*,iostat=ioerr) temp

@@ -10,8 +10,6 @@
 !
 !   Details on each routine preceed the actual routine, below.
 !
-! Version 16.323.2
-!
 
 module dcd_io
   

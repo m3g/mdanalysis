@@ -18,8 +18,6 @@
 !       eps, sig, q, e, s, class, segat, resat, typeat, classat: total
 !               number of atoms of the system
 !
-! Version 16.323.2
-!
 
 ! Static variables
  
@@ -62,7 +60,7 @@ write(*,"(/,' ####################################################',&
           &/,/,&
           & ' ####################################################',/)")    
 
-call version
+call version()
 
 ! Some default parameters
 
