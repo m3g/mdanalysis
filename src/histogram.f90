@@ -24,7 +24,7 @@
 !
 ! L. Martinez, IFSC-USP, Sep 6, 2011.
 !
-! Version 16.146
+! Version 16.323
 !
 
 program histogram
