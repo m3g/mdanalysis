@@ -61,7 +61,7 @@
 ! 
 !  Leandro Martinez, IQ-UNICAMP, June 15, 2007
 !
-!  Version 16.323
+!  Version 16.323.2
 !
 
 program globalstructure

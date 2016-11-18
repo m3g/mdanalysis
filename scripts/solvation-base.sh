@@ -10,7 +10,7 @@
 #
 #  L. Martinez, Institut Pasteur, Apr 22, 2008.
 #
-#  Version 16.323
+#  Version 16.323.2
 #
 # IMPORTANT:
 # Path for solvation program:

@@ -28,7 +28,7 @@
 ! Institute of Chemistry - State University of Campinas
 ! Aug 26, 2014
 !
-! Version 16.323
+! Version 16.323.2
 !
 
 program lifetime

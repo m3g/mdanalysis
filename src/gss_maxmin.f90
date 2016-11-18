@@ -59,7 +59,7 @@
 ! L. Martinez, Mar 13, 2014.
 ! Institute of Chemistry, State University of Campinas (UNICAMP)
 !
-! Version 16.323
+! Version 16.323.2
 !
 
 program g_solute_solvent_old
