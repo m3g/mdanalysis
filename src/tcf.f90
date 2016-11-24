@@ -318,7 +318,7 @@ do idcd = 1, ndcd
 end do
 
 if(ntotframes < lastframe) then
-  write(*,*) ' ERROR: lastrame greater than the number of frames dcd files. '
+  write(*,*) ' ERROR: lastframe greater than the number of frames dcd files. '
   stop
 end if
 if(lastframe == 0) lastframe = ntotframes

@@ -298,7 +298,7 @@ write(*,*)
 write(*,*) ' Number of atoms as specified in the dcd file: ',ntotat     
 write(*,*) ' Total number of frames in this dcd file: ', nframes
 if(nframes < lastframe) then
-  write(*,*) ' ERROR: lastrame greater than the number of '
+  write(*,*) ' ERROR: lastframe greater than the number of '
   write(*,*) '        frames of the dcd file. '
   stop
 end if
