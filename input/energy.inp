@@ -23,7 +23,7 @@ output test.dat
 firstframe 1
 lastframe last 
 stride 1
-cutoff -1.
+cutoff 15.
 
 # Scale the x-axis by
 scaletime 0.001
