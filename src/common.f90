@@ -791,9 +791,41 @@ subroutine getmaxmin(ngroup,group,iatom,xdcd,ydcd,zdcd,xmin,xmax,init)
   return
 end subroutine getmaxmin
 
+!
+! Determines the number of frames of a DCD file
+!
+! DCD comes open with header read before, and return
+! at the same point
+!
+subroutine getnframes(iunit,nframes,dcdaxis)
 
+  integer :: iunit, nframes, status
+  logical :: dcdaxis
+  integer :: i
+  real :: x
+  double precision :: side
+  character(len=4) :: char
 
+  nframes = 0
+  do
+    if(dcdaxis) then 
+      read(10,iostat=status) side
+      if ( status /= 0 ) exit
+    end if
+    read(10,iostat=status) x
+    if ( status /= 0 ) exit
+    read(10,iostat=status) x
+    if ( status /= 0 ) exit
+    read(10,iostat=status) x
+    if ( status /= 0 ) exit
+    nframes = nframes + 1
+  end do
+  rewind(10)
+  read(10) char
+  read(10) i
+  read(10) i
 
+end subroutine getnframes
 
 
 
