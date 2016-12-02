@@ -16,7 +16,7 @@ program data_average
   type data_type
     character(len=200) :: file
     integer :: n
-    double precision, allocatable :: x(:), y(:)
+    double precision, allocatable :: x(:), y(:), yint(:)
   end type data_type
 
   integer :: narg, iargc, ioerr
@@ -163,11 +163,15 @@ program data_average
   ! Interpolating data points
 
   allocate(average(nint))
+  do i = 1, ndata
+    allocate(data(i)%yint(nint))
+  end do
   do i = 1, nint
     xint = xmin + step*(i-1)
     average(i) = 0.d0
     do j = 1, ndata
-      average(i) = average(i) + interpolate(data(j)%n,data(j)%x,data(j)%y,xint)
+      data(j)%yint(i) = interpolate(data(j)%n,data(j)%x,data(j)%y,xint) 
+      average(i) = average(i) + data(j)%yint(i)
     end do
     average(i) = average(i) / ndata
   end do
@@ -178,7 +182,7 @@ program data_average
     xint = xmin + step*(i-1)
     sd = 0.d0
     do j = 1, ndata
-      sd = sd + (interpolate(data(j)%n,data(j)%x,data(j)%y,xint)-average(i))**2
+      sd = sd + (data(j)%yint(i)-average(i))**2
     end do
     sd = dsqrt(sd/(ndata-1))
     write(*,"(3(tr2,f12.5))") xint, average(i), sd
