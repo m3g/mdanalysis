@@ -23,7 +23,8 @@ program data_average
   integer :: i, j, k
   integer :: ndata, xcol, ycol, nint
   double precision :: xmin, xmax, step, xread, yread, xlast, xint
-  double precision :: average, interpolate
+  double precision :: interpolate, sd
+  double precision, allocatable :: average(:)
   character(len=200) :: record, record2
   type(data_type), allocatable :: data(:)
 
@@ -161,14 +162,26 @@ program data_average
 
   ! Interpolating data points
 
+  allocate(average(nint))
   do i = 1, nint
     xint = xmin + step*(i-1)
-    average = 0.d0
+    average(i) = 0.d0
     do j = 1, ndata
-      average = average + interpolate(data(j)%n,data(j)%x,data(j)%y,xint)
+      average(i) = average(i) + interpolate(data(j)%n,data(j)%x,data(j)%y,xint)
     end do
-    average = average / ndata
-    write(*,"(2(tr2,f12.5))") xint, average
+    average(i) = average(i) / ndata
+  end do
+  
+  ! Computing standard devation, and printing output
+
+  do i = 1, nint
+    xint = xmin + step*(i-1)
+    sd = 0.d0
+    do j = 1, ndata
+      sd = sd + (interpolate(data(j)%n,data(j)%x,data(j)%y,xint)-average(i))**2
+    end do
+    sd = dsqrt(sd/(ndata-1))
+    write(*,"(3(tr2,f12.5))") xint, average(i), sd
   end do
   
 end program data_average
