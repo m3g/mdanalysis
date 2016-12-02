@@ -19,8 +19,10 @@ FORTRAN = gfortran
 # Change the flags of the compilation if you want:
 #
 FLAGS = -O3 -ffast-math -frecord-marker=4
-# Flags for debugging
-#FLAGS = -frecord-marker=4 -fbounds-check -Wunused -g -O0
+#
+ifeq ($(MAKECMDGOALS),devel)
+  FLAGS = -Wall -fcheck=bounds
+endif
 #
 # Source files:
 SRC=.
@@ -33,6 +35,8 @@ SCR=../scripts
 
 # Base directory of instalation (do not change this)
 IDIR=$(shell dirname `pwd`)
+
+devel : all
 
 all : $(BIN)/energy \
       $(BIN)/align \
@@ -50,6 +54,7 @@ all : $(BIN)/energy \
       $(BIN)/perresidueavg \
       $(BIN)/lifetime \
       $(BIN)/gssfree \
+      $(BIN)/data_average \
       warning
 
 #
@@ -255,6 +260,16 @@ $(BIN)/gssfree : $(OBJ)/gssfree.o $(OBJ)/common.o
 
 $(OBJ)/gssfree.o : $(SRC)/gssfree.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/gssfree.o $(SRC)/gssfree.f90
+
+#
+# data_average program
+# 
+
+$(BIN)/data_average : $(OBJ)/data_average.o $(OBJ)/common.o
+	$(FORTRAN) $(FLAGS) -o $(BIN)/data_average $(OBJ)/data_average.o $(OBJ)/common.o
+
+$(OBJ)/data_average.o : $(SRC)/data_average.f90
+	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/data_average.o $(SRC)/data_average.f90
 
 #
 # This is common for all packages
