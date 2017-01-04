@@ -841,8 +841,11 @@ program g_solute_solvent
 
   ! Compute error of gssrand distribution at large distance (expected to be 1.00)
   
-  gssend = gss(nslabs)/gss_random(nslabs)
-  write(20,"('#')")
+  if ( gss(nslabs) < 1.e-10 ) then
+    write(*,*) ' ERROR: Something wrong with random normalization. Contact the developer. '
+    stop
+  end if
+  gssend = float(gss_random(nslabs))/float(gss(nslabs))
   write(20,"('# Error in random normalization at large distances: ',f12.3,'%' )") (gssend - 1.d0)*100
   write(20,"('#')")
 
@@ -874,8 +877,8 @@ program g_solute_solvent
       else
         gssnorm = 0.
       end if
-      x1 = float(gss(i))/frames
-      y1 = float(gss_random(i))/frames/gssend
+      x1 = float(gss(i))
+      y1 = float(gss_random(i))/gssend
       if ( y1 > 0. ) then
         z1 = x1 / y1
       else
