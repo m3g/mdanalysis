@@ -10,7 +10,7 @@
 #
 #  L. Martinez, Institut Pasteur, Mar 26, 2008.
 #
-#  Version 16.341
+#  Version 17.004
 #
 # IMPORTANT:
 # Path for hbonds program: modify if not in the current directory
