@@ -107,7 +107,7 @@ program g_solute_solvent
   
   ! Seed for random number generator
   
-  seed = 0.48154278727d0
+  seed = 0.48154278727e0
   
   ! Some default parameters
   
@@ -627,7 +627,7 @@ program g_solute_solvent
       ! generated
 
       totalvolume = axis(1)*axis(2)*axis(3)
-      nrsolvent2 = nrsolvent * totalvolume / ( totalvolume - exclude_volume )
+      nrsolvent2 = nrsolvent * int(totalvolume / ( totalvolume - exclude_volume ))
       nsolvent2 = nrsolvent2*natoms_solvent
 
       ! Create random coordinates for 'nrsolvent2' solvent molecules, inside
@@ -726,7 +726,7 @@ program g_solute_solvent
       ! For each solvent residue, get the MINIMUM, MAXIMUM and AVERAGE distances to the solute
     
       do i = 1, nrsolvent2
-        mind(i) = cutoff + 1.d0
+        mind(i) = cutoff + 1.e0
       end do
       do i = 1, nsmalld
         isolvent = nrsolv2(ismalld(i))
@@ -778,7 +778,7 @@ program g_solute_solvent
       ! For each solvent residue, get the MINIMUM distance to the solute
     
       do i = 1, nrsolvent
-        mind(i) = cutoff + 1.d0
+        mind(i) = cutoff + 1.e0
       end do
       do i = 1, nsmalld
         isolvent = nrsolv(ismalld(i))
@@ -847,8 +847,8 @@ program g_solute_solvent
              &'#       6  GSS computed from random solvent distribution, not normalized ',/,&
              &'#       7  Cumulative sum of sites for the random distribution, averaged on frames. ')")
   write(20,"( '#',/,&      
-    '#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
-        t76,'6-GSS RND',t88,'7-CUMUL RND' )" )
+   &'#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
+   &t76,'6-GSS RND',t88,'7-CUMUL RND' )" )
   
   frames=float(lastframe-firstframe+1)/float(stride)
   gsssum = 0

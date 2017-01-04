@@ -91,7 +91,7 @@ program globalstructure
     else if(keyword(record).eq.'dcdfile') then
       dcdfile = value(record)
     else if(keyword(record).eq.'reference') then
-      reference = value(record)
+      reference = trim(value(record))
     else if(keyword(record).eq.'scaletime') then
       record = value(record)
       read(record,*) scaletime
@@ -309,9 +309,9 @@ program globalstructure
         aref(i,2) = aref(i,2) + y(ifr,i)
         aref(i,3) = aref(i,3) + z(ifr,i)
       end do
-      aref(i,1) = aref(i,1) / dfloat(lframe-iframe)
-      aref(i,2) = aref(i,2) / dfloat(lframe-iframe)
-      aref(i,3) = aref(i,3) / dfloat(lframe-iframe)
+      aref(i,1) = aref(i,1) / float(lframe-iframe)
+      aref(i,2) = aref(i,2) / float(lframe-iframe)
+      aref(i,3) = aref(i,3) / float(lframe-iframe)
     end do
   end if
 
@@ -370,9 +370,9 @@ program globalstructure
     ym = ym + y(ifr,i)
     zm = zm + z(ifr,i)
   end do
-  xm = xm / dfloat(natom)
-  ym = ym / dfloat(natom)
-  zm = zm / dfloat(natom)
+  xm = xm / float(natom)
+  ym = ym / float(natom)
+  zm = zm / float(natom)
 
   ! Computing the gyration radius
       

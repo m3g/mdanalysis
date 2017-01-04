@@ -39,10 +39,10 @@ logical int0, int1, int2
 ! Default parameter values
 
 col = 1
-min = +1.d30
-max = -1.d30
+min = +1.e30
+max = -1.e30
 nsteps = 100
-step = -1.d0
+step = -1.e0
 int0 = .false.
 int1 = .false.
 int2 = .false.
@@ -123,8 +123,8 @@ do
   end if
 
   ndata = ndata + 1
-  min = dmin1(val,min)
-  max = dmax1(val,max)
+  min = min1(val,min)
+  max = max1(val,max)
 
 end do
 
@@ -175,7 +175,7 @@ do
   average = average + val
   do i = 1, nsteps + 1
     if ( val >= ( xhist(i) - step ) .and. &
-         val <= ( xhist(i) + step ) ) yhist(i) = yhist(i) + 1.d0
+         val <= ( xhist(i) + step ) ) yhist(i) = yhist(i) + 1.e0
   end do 
 end do
 average = average / float(ndata)
@@ -209,7 +209,7 @@ pmax = 0.d0
 do i = 1, nsteps + 1
   yhist(i) = yhist(i) / ndata
   if ( int0 ) integral = integral + yhist(i)*step
-  if ( int1 ) pmax = dmax1(pmax,yhist(i))
+  if ( int1 ) pmax = max1(pmax,yhist(i))
 end do
 if ( int0 ) then
   do i = 1, nsteps + 1

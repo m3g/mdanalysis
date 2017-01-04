@@ -567,8 +567,8 @@ program hbonds
         xmax(3) = axis(3)/2.  
       else 
         do i = 1, 3
-          xmin(i) = 1.d30
-          xmax(i) = -1.d30
+          xmin(i) = 1.e30
+          xmax(i) = -1.e30
         end do
         do i = 1, ngroup1
           ii = iatom + group1(i)

@@ -515,7 +515,7 @@ do idcd = 1, ndcd
   
     if ( i == ifcount2 ) then
       write(*,"( /,'  Reading DCD file ',i4,' and computing vectors: ',&
-                  f6.2,'%' )", advance="no") idcd, 0.
+                 &f6.2,'%' )", advance="no") idcd, 0.
     else
       write(*,"( 7a,f6.2,'%' )",advance='no')&
            (char(8),j=1,7), 100.*float(iframe)/float(ntotframes)

@@ -170,7 +170,7 @@ program lifetime
   end do
 
   write(*,"( '#',/,'#  Survival interval', t25,' Normalized average ',&
-                   t49,' Average Number of bonds', t78, ' Number of Bonds ')")
+                  &t49,' Average Number of bonds', t78, ' Number of Bonds ')")
   do i = 1, maxsurvival
     j = (i-1)*deltaframe
     write(*,"( i20, t27, e12.5, t53, f12.5, t68, i20 )") j, real(histogram(i))/real(histogram(1)),&

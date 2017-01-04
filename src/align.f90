@@ -1111,12 +1111,12 @@ end
       integer i, j, k, n, m 
       real v1, v2, v3, u, omg, c, rho, tes, scl, tem, s
       real a(4,4),v(4,4)
-      rho=1.0d-12 
+      rho=1.e-12 
       tes=0. 
       scl=0. 
       do 10 i=1,n 
    10 scl=scl+a(i,i)**2 
-      scl=sqrt(scl)/dfloat(n) 
+      scl=sqrt(scl)/float(n) 
       do 20 i=1,n 
       do 20 j=1,n 
    20 a(i,j)=a(i,j)/scl 
@@ -1130,7 +1130,7 @@ end
   100 tes=tes+2.*a(i,j)*a(i,j) 
       tes=sqrt(tes) 
       m=0 
-  105 tes=tes/dfloat(n) 
+  105 tes=tes/float(n) 
       if(tes.lt.rho)tes=rho 
   110 do 165 i=2,n 
       do 165 j=1,i-1 

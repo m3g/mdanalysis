@@ -19,6 +19,7 @@ FORTRAN = gfortran
 # Change the flags of the compilation if you want:
 #
 FLAGS = -O3 -ffast-math -frecord-marker=4
+GENCANFLAGS = -O3 -ffast-math
 #
 ifeq ($(MAKECMDGOALS),devel)
   FLAGS = -Wall -fcheck=bounds
@@ -211,15 +212,15 @@ $(OBJ)/tcf.o : $(SRC)/tcf.f90
 #
 
 $(BIN)/fitexp : $(OBJ)/common.o $(OBJ)/fitexp.o $(OBJ)/algencan-pocket.o
-	$(FORTRAN) $(FLAGS) -o $(BIN)/fitexp $(OBJ)/fitexp.o \
-                                           $(OBJ)/common.o \
-                                           $(OBJ)/algencan-pocket.o
+	$(FORTRAN) $(GENCANFLAGS) -o $(BIN)/fitexp $(OBJ)/fitexp.o \
+                                                $(OBJ)/common.o \
+                                                $(OBJ)/algencan-pocket.o
 
 $(OBJ)/fitexp.o : $(SRC)/fitexp.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/fitexp.o $(SRC)/fitexp.f90
 
 $(OBJ)/algencan-pocket.o : $(SRC)/algencan-pocket.f
-	$(FORTRAN) -O3 -ffast-math -c -o $(OBJ)/algencan-pocket.o $(SRC)/algencan-pocket.f
+	$(FORTRAN) $(GENCANFLAGS) -c -o $(OBJ)/algencan-pocket.o $(SRC)/algencan-pocket.f
 
 #
 # histogram program

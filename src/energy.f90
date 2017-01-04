@@ -656,7 +656,7 @@ sigma = s1 + s2
 epsilon = sqrt( e1 * e2 ) 
 p6 = sigma**6 / rij2**3
 p12 = p6 * p6
-vdwpair = epsilon * ( p12 - 2.d0 * p6 )
+vdwpair = epsilon * ( p12 - 2. * p6 )
 
 return
 end      

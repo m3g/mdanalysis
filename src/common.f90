@@ -311,8 +311,8 @@ subroutine chkperiod(dcdfile,dcdaxis,readfromdcd)
     close(10)
     if( status /= 0 ) then
       write(*,"(' ERROR: Could not read either coordinates nor ',/,&
-                '        periodic cell sizes in first line of ',/,&
-                '        first frame of DCD file.' )")
+               &'        periodic cell sizes in first line of ',/,&
+               &'        first frame of DCD file.' )")
       stop
     end if
     dcdaxis = .true.
@@ -809,21 +809,21 @@ subroutine getnframes(iunit,nframes,dcdaxis)
   nframes = 0
   do
     if(dcdaxis) then 
-      read(10,iostat=status) side
+      read(iunit,iostat=status) side
       if ( status /= 0 ) exit
     end if
-    read(10,iostat=status) x
+    read(iunit,iostat=status) x
     if ( status /= 0 ) exit
-    read(10,iostat=status) x
+    read(iunit,iostat=status) x
     if ( status /= 0 ) exit
-    read(10,iostat=status) x
+    read(iunit,iostat=status) x
     if ( status /= 0 ) exit
     nframes = nframes + 1
   end do
-  rewind(10)
-  read(10) char
-  read(10) i
-  read(10) i
+  rewind(iunit)
+  read(iunit) char
+  read(iunit) i
+  read(iunit) i
 
 end subroutine getnframes
 

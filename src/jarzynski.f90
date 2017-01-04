@@ -116,7 +116,7 @@ allocate ( work(nlogs,maxdata),&
 
 ! Conversion factor from pN x A to kcal/mol 
 
-conv = 1.d0 / 69.479d0
+conv = 1.e0 / 69.479e0
 
 ! Use SMD output jumping some of them or not (1 uses all)
 
@@ -178,16 +178,16 @@ end do
 
 ! Computing the free energy as a function of the distance
 
-beta = 1.688934106d0
+beta = 1.688934106e0
 
 ! Output table title
 
 write(*,"( '# Column 1: Displacement of the string ',/,&
-           '# Column 2: Free energy computed using exponential average. ',/,&
-           '# Column 3: Variance of works. ',/,&
-           '# Column 4: Free energy computed with second order cumulant ',/,&
-           '#           approximation of exponentials. ',/,&
-           '# Column 5 to N: Work for each individual simulation. ')")
+          &'# Column 2: Free energy computed using exponential average. ',/,&
+          &'# Column 3: Variance of works. ',/,&
+          &'# Column 4: Free energy computed with second order cumulant ',/,&
+          &'#           approximation of exponentials. ',/,&
+          &'# Column 5 to N: Work for each individual simulation. ')")
 
 
 print = 100
@@ -195,29 +195,29 @@ do i = 1, maxdata, max( maxdata / print , 1 )
 
 ! Computing work averages for this distance
 
-  waverage = 0.d0
-  wexpav = 0.d0
-  w2av = 0.d0
+  waverage = 0.e0
+  wexpav = 0.e0
+  w2av = 0.e0
   do ilog = 1, nlogs
     waverage = waverage + work(ilog,i)
     wexpav = wexpav + exp( - beta * work(ilog,i) ) 
     w2av = w2av + work(ilog,i)**2
   end do
-  waverage = waverage / dfloat(nlogs)
-  w2av = w2av / dfloat(nlogs)
-  wexpav = wexpav / dfloat(nlogs)
+  waverage = waverage / float(nlogs)
+  w2av = w2av / float(nlogs)
+  wexpav = wexpav / float(nlogs)
 
 ! Computing the exponential average
 
-  if( wexpav > 1.d-10 ) then
+  if( wexpav > 1.e-10 ) then
     expenergy = -log( wexpav ) / beta
   else
-    expenergy = 0.d0
+    expenergy = 0.e0
   end if
 
 ! Computing the cumulant expansion - second order
 
-  cumenergy = waverage - 0.5d0 * beta * ( w2av - waverage**2 )
+  cumenergy = waverage - 0.5e0 * beta * ( w2av - waverage**2 )
 
 ! Writting data for this line
 

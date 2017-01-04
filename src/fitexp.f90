@@ -247,8 +247,8 @@ do it = 1, ntrials
                 &e14.6,tr2,e14.6 )") i, l(nterms+i), u(nterms+i)
     end do
     write(10,"( '# Best fit found: ' )")
-    write(10,"( '# Trial = ',i6 )"), it
-    write(10,"( '# Error = ',e14.6 )"), fbest
+    write(10,"( '# Trial = ',i6 )") it
+    write(10,"( '# Error = ',e14.6 )") fbest
     write(10,"( '# ',tr5,' y = ' )")
     do i = 1, nterms
       write(10,&

@@ -118,7 +118,7 @@ program g_solute_solvent_old
   
   ! Seed for random number generator
   
-  seed = 0.48154278727d0
+  seed = 0.48154278727e0
   
   ! Some default parameters
   
@@ -837,8 +837,8 @@ program g_solute_solvent_old
              &'#       6  GSS computed from random solvent distribution, not normalized ',/,&
              &'#       7  Cumulative sum of sites for the random distribution. ')")
   write(20,"( '#',/,&      
-    '#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
-        t76,'6-GSS RND',t88,'7-CUMUL RND' )" )
+   &'#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
+   &t76,'6-GSS RND',t88,'7-CUMUL RND' )" )
   
   frames=float(lastframe-firstframe+1)/float(stride)
   gsssum = 0
@@ -903,8 +903,8 @@ program g_solute_solvent_old
              &'#       6  GSS computed from random solvent distribution, not normalized ',/,&
              &'#       7  Cumulative sum of sites for the random distribution. ')")
   write(20,"( '#',/,&      
-    '#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
-        t76,'6-GSS RND',t88,'7-CUMUL RND' )" )
+   &'#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
+   &t76,'6-GSS RND',t88,'7-CUMUL RND' )" )
   
   frames=float(lastframe-firstframe+1)/float(stride)
   gsssum = 0
@@ -969,8 +969,8 @@ program g_solute_solvent_old
              &'#       6  GSS computed from random solvent distribution, not normalized ',/,&
              &'#       7  Cumulative sum of sites for the random distribution. ')")
   write(20,"( '#',/,&      
-    '#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
-        t76,'6-GSS RND',t88,'7-CUMUL RND' )" )
+   &'#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
+   &t76,'6-GSS RND',t88,'7-CUMUL RND' )" )
   
   frames=float(lastframe-firstframe+1)/float(stride)
   gsssum = 0
