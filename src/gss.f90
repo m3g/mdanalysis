@@ -68,7 +68,7 @@ program g_solute_solvent
           x1, y1, z1, time0, etime, tarray(2),&
           gssnorm, gssstep, frames,&
           density, dbox_x, dbox_y, dbox_z, cutoff, probeside, exclude_volume,&
-          totalvolume, xmin(3), xmax(3), gssmax, kbint
+          totalvolume, xmin(3), xmax(3), gssmax, kbint, gssend
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
                         output
@@ -838,6 +838,16 @@ program g_solute_solvent
              &periodic, readfromdcd, &
              &nsolute, mass1, solute(1), solute(nsolute),& 
              &nsolvent, mass2, solvent(1), solvent(nsolvent)  
+
+  ! Compute error of gssrand distribution at large distance (expected to be 1.00)
+  
+  gssend = gss(nslabs)/gss_random(nslabs)
+  write(20,"('#')")
+  write(20,"('# Error in random normalization at large distances: ',f12.3,'%' )") (gssend - 1.d0)*100
+  write(20,"('#')")
+
+  ! Output table
+
   write(20,"( '# COLUMNS CORRESPOND TO: ',/,&
              &'#       1  Minimum distance to solute (dmin)',/,&
              &'#       2  GSS normalized by the GSS RAND distribution. ',/,&
@@ -850,7 +860,7 @@ program g_solute_solvent
   write(20,"( '#',/,&      
    &'#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
    &t76,'6-GSS RND',t88,'7-CUMUL RND',t105,'8-KB INT' )" )
-  
+
   frames=float(lastframe-firstframe+1)/float(stride)
   gsssum = 0
   gsssum_random = 0
@@ -865,13 +875,13 @@ program g_solute_solvent
         gssnorm = 0.
       end if
       x1 = float(gss(i))/frames
-      y1 = float(gss_random(i))/frames
+      y1 = float(gss_random(i))/frames/gssend
       if ( y1 > 0. ) then
         z1 = x1 / y1
       else
         z1 = 0.
       end if
-      kbint = kbint + z1 - 1.d0
+      kbint = kbint + z1 - 1.e0
       write(20,"( 8(tr2,f12.7) )")&
       i*gssstep-gssstep/2., z1, gssnorm, float(gss(i))/frames, float(gsssum)/frames, &
                             float(gss_random(i))/frames, float(gsssum_random)/frames, kbint
