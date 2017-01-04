@@ -849,7 +849,7 @@ program g_solute_solvent
              &'#       8  Kirwood-Buff integral (int gss - 1) ')")
   write(20,"( '#',/,&      
    &'#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
-   &t76,'6-GSS RND',t88,'7-CUMUL RND',t100,'8-KB INT' )" )
+   &t76,'6-GSS RND',t88,'7-CUMUL RND',t105,'8-KB INT' )" )
   
   frames=float(lastframe-firstframe+1)/float(stride)
   gsssum = 0
