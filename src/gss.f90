@@ -872,7 +872,7 @@ program g_solute_solvent
         z1 = 0.
       end if
       kbint = kbint + z1 - 1.d0
-      write(20,"( 7(tr2,f12.7) )")&
+      write(20,"( 8(tr2,f12.7) )")&
       i*gssstep-gssstep/2., z1, gssnorm, float(gss(i))/frames, float(gsssum)/frames, &
                             float(gss_random(i))/frames, float(gsssum_random)/frames, kbint
     end if
