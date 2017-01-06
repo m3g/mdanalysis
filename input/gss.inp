@@ -5,20 +5,22 @@
 #
 
 # System:
-psf /home/leandro/Downloads/ivan0.psf
-dcd /home/leandro/Downloads/ivan0.dcd
+psf ./toy.psf
+dcd ./production.dcd
 
 # Group definitions: group1 and group2 can be VMD-style selections
 # if the program is running from the gss.sh script (and VMD is available)
-solute protein and hydrophobic
-solvent resname TIP3
+#solute segname BGLC
+#solvent resname TIP3
+solute segname BGLC and name C1
+solvent resname TIP3 and name OH2
 
 # Optionally, you can set a different selection from the solute to be the
 # volume excluded in the computation (this affects the normalization of
 # the gss function). For example, the excluded volume can be a complete
 # protein, while the gss is computed only for the hydrophobic residues.
 # If "exclude" is not set, it will be the "solute" selection. 
-exclude protein
+exclude segname BGLC
 
 # Otherwise, use a pdb file with beta factors (1.00 for group1 and 2.00 for group2)
 # and "1.00" in the occupancy factor for the excluded selection.
@@ -53,5 +55,12 @@ cutoff 10.
 # Probe side: Used for the estimation of the solute volume
 # Default: 2 Angstrom.
 probeside 2.
+
+# Scalelast: scale gss curve so that at the most distant point
+# it values exactly 1. Check the error in normalization which is
+# reported in the output file to know how much this affects the
+# output 
+scalelast yes
+
 
 

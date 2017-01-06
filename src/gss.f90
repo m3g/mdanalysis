@@ -68,12 +68,12 @@ program g_solute_solvent
           x1, y1, z1, time0, etime, tarray(2),&
           gssnorm, gssstep, frames,&
           density, dbox_x, dbox_y, dbox_z, cutoff, probeside, exclude_volume,&
-          totalvolume, xmin(3), xmax(3), gssmax, kbint, gssend
+          totalvolume, xmin(3), xmax(3), gssmax, kbint, gsslast
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
                         output
   character(len=4) :: dummyc
-  logical :: readfromdcd, dcdaxis, periodic
+  logical :: readfromdcd, dcdaxis, periodic, scalelast
   
   ! Allocatable arrays
   
@@ -121,6 +121,7 @@ program g_solute_solvent
   gssmax = 20.
   density = 1.
   probeside = 2.
+  scalelast = .true.
   
   ! Open input file and read parameters
   
@@ -204,6 +205,10 @@ program g_solute_solvent
       write(*,"(a,/,a)") ' ERROR: The options solute and solvent must be used ',&
                          '        with the gss.sh script, not directly. '
       stop
+    else if(keyword(record) == 'scalelast') then
+      line = value(record)
+      if ( trim(line) == 'yes' ) scalelast = .true.
+      if ( trim(line) == 'no' ) scalelast = .false.
     else if(record(1:1) /= '#' .and. & 
             keyword(record) /= 'par' .and. &
             record(1:1) > ' ') then
@@ -823,7 +828,7 @@ program g_solute_solvent
              &'# First frame: ',i5,' Last frame: ',i5,' Stride: ',i5,/,&
              &'#',/,&
              &'# Periodic boundary conditions: ',/,&
-             &'# Periodic: ',l1,' Read from DCD: ',l1,&
+             &'# Periodic: ',l1,' Read from DCD: ',l1,/,&
              &'#',/,&
              &'# Number of atoms and mass of group 1: ',i6,f12.3,/,&
              &'# First and last atoms of group 1: ',i6,tr1,i6,/,&
@@ -845,8 +850,11 @@ program g_solute_solvent
     write(*,*) ' ERROR: Something wrong with random normalization. Contact the developer. '
     stop
   end if
-  gssend = float(gss_random(nslabs))/float(gss(nslabs))
-  write(20,"('# Error in random normalization at large distances: ',f12.3,'%' )") (gssend - 1.d0)*100
+  gsslast = float(gss_random(nslabs))/float(gss(nslabs))
+  write(20,"('# Error in random normalization at large distances: ',f12.3,'%' )") (gsslast - 1.d0)*100
+  if ( scalelast ) then
+    write(20,"('# scalelast is true, so GSS/GSSRND (column 2) is divided by: ',f12.3 )") gsslast
+  end if
   write(20,"('#')")
 
   ! Output table
@@ -855,7 +863,7 @@ program g_solute_solvent
              &'#       1  Minimum distance to solute (dmin)',/,&
              &'#       2  GSS normalized by the GSS RAND distribution. ',/,&
              &'#       3  GSS normalized according to spherical volume of radius dmin.',/,&
-             &'#       4  GSS not normalized at all (just site count for each dmin)',/,&
+             &'#       4  GSS not normalized at all (just site count for each dmin, averaged over frames)',/,&
              &'#       5  Cumulative sum of sites (averaged over the number of frames) ',/,&
              &'#       6  GSS computed from random solvent distribution, not normalized ',/,&
              &'#       7  Cumulative sum of sites for the random distribution, averaged on frames.',/,&
@@ -878,7 +886,7 @@ program g_solute_solvent
         gssnorm = 0.
       end if
       x1 = float(gss(i))
-      y1 = float(gss_random(i))/gssend
+      y1 = float(gss_random(i))/gsslast
       if ( y1 > 0. ) then
         z1 = x1 / y1
       else
