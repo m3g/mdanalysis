@@ -937,9 +937,9 @@ real function shellvolume(radius,step)
 
   implicit none
   real :: radius, step
-  real, parameter :: fourpi = 4.*3.1415925655
+  real, parameter :: fourthirdsofpi = (4./3.)*3.1415925655
 
-  shellvolume = fourpi * 2 * radius * step
+  shellvolume = fourthirdsofpi*( 2*step*(3*radius**2+step**2) ) 
 
 end function shellvolume
 
