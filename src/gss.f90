@@ -59,21 +59,22 @@ program g_solute_solvent
              status, keystatus, ndim, iargc, lastatom, nres, nrsolute, nrexclude,&
              nrsolvent, kframe, irad, gsssum, nslabs, natoms_solvent,&
              gsssum_random, nsmalld, nrsolvent2, ibox, jbox, kbox,&
-             noccupied, nbdim(3), nboxes(3), maxsmalld
+             noccupied, nbdim(3), nboxes(3), maxsmalld, frames
   double precision :: readsidesx, readsidesy, readsidesz, t
   real :: side(memory,3), mass1, mass2, seed,&
           cmx, cmy, cmz, beta, gamma, theta, random, axis(3)
   real, parameter :: twopi = 2.*3.1415925655
   real :: dummyr, xdcd(memory), ydcd(memory), zdcd(memory),&
           x1, y1, z1, time0, etime, tarray(2),&
-          gssnorm, gssstep, frames,&
+          gssnorm, gssstep, &
           density, dbox_x, dbox_y, dbox_z, cutoff, probeside, exclude_volume,&
-          totalvolume, xmin(3), xmax(3), gssmax, kbint, gsslast
+          totalvolume, xmin(3), xmax(3), gssmax, kbint, gsslast, radius, bulkdensity
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
                         output
   character(len=4) :: dummyc
   logical :: readfromdcd, dcdaxis, periodic, scalelast
+  real :: shellvolume
   
   ! Allocatable arrays
   
@@ -494,6 +495,11 @@ program g_solute_solvent
     stop
   end if
   
+  ! Number of frames (used for output only)
+  
+  frames=(lastframe-firstframe+1)/stride
+  write(*,*) ' Number of frames to read: ', frames
+
   ! Now going to read the dcd file
   
   memframes = memory / ntotat
@@ -855,6 +861,10 @@ program g_solute_solvent
   if ( scalelast ) then
     write(20,"('# scalelast is true, so GSS/GSSRND (column 2) is divided by: ',f12.3 )") gsslast
   end if
+
+  radius = nslabs*gssstep - gssstep/2.
+  bulkdensity = gss(nslabs) / (frames*shellvolume(radius,gssstep))
+  write(20,"('# Solvent density at bulk (largest distance) in sites/vol: ',e12.5 )") bulkdensity
   write(20,"('#')")
 
   ! Output table
@@ -872,31 +882,28 @@ program g_solute_solvent
    &'#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
    &t76,'6-GSS RND',t88,'7-CUMUL RND',t105,'8-KB INT' )" )
 
-  frames=float(lastframe-firstframe+1)/float(stride)
   gsssum = 0
   gsssum_random = 0
   kbint = 0.e0
   do i = 1, nslabs
-    if ( gss(i) > 0 ) then
-      gsssum = gsssum + gss(i)
-      gsssum_random = gsssum_random + gss_random(i)
-      if(i > 1) then
-        gssnorm = gss(i)/(frames*2.*twopi*((i-1)*gssstep)**2*gssstep)
-      else
-        gssnorm = 0.
-      end if
-      x1 = float(gss(i))
-      y1 = float(gss_random(i))/gsslast
-      if ( y1 > 0. ) then
-        z1 = x1 / y1
-      else
-        z1 = 0.
-      end if
-      kbint = kbint + z1 - 1.e0
-      write(20,"( 8(tr2,f12.7) )")&
-      i*gssstep-gssstep/2., z1, gssnorm, float(gss(i))/frames, float(gsssum)/frames, &
-                            float(gss_random(i))/frames, float(gsssum_random)/frames, kbint
+    if ( gss(i) == 0 ) cycle
+    radius = i*gssstep - gssstep/2.
+    gsssum = gsssum + gss(i)
+    gsssum_random = gsssum_random + gss_random(i)
+    ! Normalization by spherical shell of this radius
+    gssnorm = gss(i) / ( bulkdensity*shellvolume(radius,gssstep) )
+    ! Normalization by random distribution of molecules
+    x1 = float(gss(i))
+    y1 = float(gss_random(i))/gsslast
+    if ( y1 > 0. ) then
+      z1 = x1 / y1
+    else
+      z1 = 0.
     end if
+    kbint = kbint + z1 - 1.e0
+    write(20,"( 8(tr2,f12.7) )")&
+    radius, z1, gssnorm/frames, float(gss(i))/frames, float(gsssum)/frames, &
+            float(gss_random(i))/frames, float(gsssum_random)/frames, kbint
   end do
   close(20)
 
@@ -922,3 +929,26 @@ program g_solute_solvent
   write(*,*)        
 
 end program g_solute_solvent
+
+! Computes the volume of the spherical shell of radius
+! 'radius', defined within [radius-step/2,radius+step,2].
+
+real function shellvolume(radius,step)
+
+  implicit none
+  real :: radius, step
+  real, parameter :: fourpi = 4.*3.1415925655
+
+  shellvolume = fourpi * 2 * radius * step
+
+end function shellvolume
+
+
+
+
+
+
+
+
+
+
