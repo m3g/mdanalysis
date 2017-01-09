@@ -69,7 +69,7 @@ program g_solute_solvent
           x1, y1, z1, time0, etime, tarray(2),&
           gssnorm, gssstep, &
           density, dbox_x, dbox_y, dbox_z, cutoff, probeside, exclude_volume,&
-          totalvolume, xmin(3), xmax(3), gssmax, kbint, radius, bulkdensity
+          totalvolume, xmin(3), xmax(3), gssmax, kbint, kbintsphere, radius, bulkdensity
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
                         output
@@ -872,23 +872,25 @@ program g_solute_solvent
   ! Output table
 
   write(20,"( '# COLUMNS CORRESPOND TO: ',/,&
-             &'#       1  Minimum distance to solute (dmin)',/,&
-             &'#       2  GSS normalized by the GSS RAND distribution. ',/,&
-             &'#       3  GSS normalized according to spherical volume of radius dmin.',/,&
-             &'#       4  GSS not normalized at all (just site count for each dmin, averaged over frames)',/,&
-             &'#       5  Cumulative sum of sites (averaged over the number of frames) ',/,&
-             &'#       6  GSS computed from random solvent distribution, not normalized ',/,&
-             &'#       7  Cumulative sum of sites for the random distribution, averaged on frames.',/,&
-             &'#       8  Kirwood-Buff integral computed from column 2 (int gss - 1) ')")
+  &'#       1  Minimum distance to solute (dmin)',/,&
+  &'#       2  GSS normalized by the GSS RAND distribution. ',/,&
+  &'#       3  GSS normalized according to spherical volume of radius dmin.',/,&
+  &'#       4  Site count for each dmin, averaged over frames',/,&
+  &'#       5  Cumulative sum of sites, averaged over the number of frames  ',/,&
+  &'#       6  Site count computed from random solvent distribution, averaged over frames.',/,&
+  &'#       7  Cumulative sum of sites for the random distribution, averaged over frames.',/,&
+  &'#       8  Kirwood-Buff integral computed from column 2 with volume estimated from col 6 (int V(r)*(gss-1) dr ',/,&
+  &'#       9  Kirwood-Buff integral computed from column 2 with spherical shell volume (int 4*pi*r^2*(gss-1) dr ')")
   write(20,"( '#',/,&      
-   &'#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
-   &t76,'6-GSS RND',t88,'7-CUMUL RND',t105,'8-KB INT' )" )
+  &'#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
+  &t76,'6-GSS RND',t88,'7-CUMUL RND',t105,'8-KB RND',t119,'9-KB SPH' )" )
 
   gsssum = 0
   gsssum_random = 0
   kbint = 0.e0
+  kbintsphere = 0.e0
   do i = 1, nslabs
-    if ( gss(i) == 0 ) cycle
+    if ( gss_random(i) == 0 ) cycle
     radius = i*gssstep - gssstep/2.
     gsssum = gsssum + gss(i)
     gsssum_random = gsssum_random + gss_random(i)
@@ -902,11 +904,10 @@ program g_solute_solvent
     else
       z1 = 0.
     end if
-    if ( gss_random(i) > 0. ) then
-      kbint = kbint + (gsssum - gsssum_random)/gss_random(i)
-    end if
-    write(20,"( 8(tr2,f12.7) )")&
-    radius, z1, gssnorm, gss(i), gsssum, gss_random(i), gsssum_random, kbint
+    kbint = kbint + (z1 - 1.e0)*(gss_random(i)/bulkdensity)
+    kbintsphere = kbintsphere + (z1 - 1.e0)*shellvolume(radius,gssstep)
+    write(20,"( 9(tr2,f12.7) )")&
+    radius, z1, gssnorm, gss(i), gsssum, gss_random(i), gsssum_random, kbint, kbintsphere
   end do
   close(20)
 
