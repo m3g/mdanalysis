@@ -57,9 +57,10 @@ program g_solute_solvent
              nframes, dummyi, i, ntotat, memframes, ncycles, memlast,&
              j, iframe, icycle, nfrcycle, iatom, k, ii, jj, &
              status, keystatus, ndim, iargc, lastatom, nres, nrsolute, nrexclude,&
-             nrsolvent, kframe, irad, gsssum, nslabs, natoms_solvent,&
-             gsssum_random, nsmalld, nrsolvent2, ibox, jbox, kbox,&
+             nrsolvent, kframe, irad, nslabs, natoms_solvent,&
+             nsmalld, nrsolvent2, ibox, jbox, kbox,&
              noccupied, nbdim(3), nboxes(3), maxsmalld, frames
+  real :: gsssum, gsssum_random, gsslast
   double precision :: readsidesx, readsidesy, readsidesz, t
   real :: side(memory,3), mass1, mass2, seed,&
           cmx, cmy, cmz, beta, gamma, theta, random, axis(3)
@@ -68,7 +69,7 @@ program g_solute_solvent
           x1, y1, z1, time0, etime, tarray(2),&
           gssnorm, gssstep, &
           density, dbox_x, dbox_y, dbox_z, cutoff, probeside, exclude_volume,&
-          totalvolume, xmin(3), xmax(3), gssmax, kbint, gsslast, radius, bulkdensity
+          totalvolume, xmin(3), xmax(3), gssmax, kbint, radius, bulkdensity
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
                         output
@@ -81,9 +82,8 @@ program g_solute_solvent
   integer, allocatable :: solute(:), solvent(:), resid(:), solute2(:), solvent2(:), &
                           natres(:), fatres(:), fatrsolute(:), fatrsolvent(:), exclude(:),&
                           fatrexclude(:),&
-                          nrsolv(:), gss(:), gss_random(:), gss_max(:), gss_max_random(:),&
-                          gss_avg(:), gss_avg_random(:), nrsolv2(:),&
-                          ismalld(:)
+                          nrsolv(:), nrsolv2(:), ismalld(:)
+  real, allocatable :: gss(:), gss_random(:)
   real, allocatable :: eps(:), sig(:), q(:), e(:), s(:), mass(:),&
                        solvent_molecule(:,:), &
                        xref(:), yref(:), zref(:), xrnd(:), yrnd(:), zrnd(:),&
@@ -263,8 +263,7 @@ program g_solute_solvent
   end if
   
   write(*,*) ' Number of volume slabs: ', nslabs
-  allocate( gss(nslabs), gss_random(nslabs), gss_max(nslabs), gss_max_random(nslabs),&
-            gss_avg(nslabs), gss_avg_random(nslabs) )
+  allocate( gss(nslabs), gss_random(nslabs) )
 
   gssstep = gssmax / float(nslabs)
          
@@ -514,12 +513,8 @@ program g_solute_solvent
   ! Reseting the gss distribution function
   
   do i = 1, nslabs
-    gss(i) = 0
-    gss_random(i) = 0
-    gss_max(i) = 0
-    gss_max_random(i) = 0
-    gss_avg(i) = 0
-    gss_avg_random(i) = 0
+    gss(i) = 0.e0
+    gss_random(i) = 0.e0
   end do
 
   ! Initializing hasatoms array
@@ -751,7 +746,7 @@ program g_solute_solvent
       do i = 1, nrsolvent2
         irad = int(float(nslabs)*mind(i)/gssmax)+1
         if ( irad <= nslabs ) then
-          gss_random(irad) = gss_random(irad) + 1
+          gss_random(irad) = gss_random(irad) + 1.e0
         end if
       end do
 
@@ -803,7 +798,7 @@ program g_solute_solvent
       do i = 1, nrsolvent
         irad = int(float(nslabs)*mind(i)/gssmax)+1
         if( irad <= nslabs ) then
-          gss(irad) = gss(irad) + 1
+          gss(irad) = gss(irad) + 1.e0
         end if
       end do
 
@@ -850,20 +845,27 @@ program g_solute_solvent
              &nsolute, mass1, solute(1), solute(nsolute),& 
              &nsolvent, mass2, solvent(1), solvent(nsolvent)  
 
+  ! Averaget counts over the number of frames
+
+  do i = 1, nslabs
+    gss(i) = gss(i) / frames
+    gss_random(i) = gss_random(i) / frames
+  end do
+
   ! Compute error of gssrand distribution at large distance (expected to be 1.00)
-  
+
   if ( gss(nslabs) < 1.e-10 ) then
     write(*,*) ' ERROR: Something wrong with random normalization. Contact the developer. '
     stop
   end if
-  gsslast = float(gss_random(nslabs))/float(gss(nslabs))
+  gsslast = gss_random(nslabs)/gss(nslabs)
   write(20,"('# Error in random normalization at large distances: ',f12.3,'%' )") (gsslast - 1.d0)*100
   if ( scalelast ) then
     write(20,"('# scalelast is true, so GSS/GSSRND (column 2) is divided by: ',f12.3 )") gsslast
   end if
 
   radius = nslabs*gssstep - gssstep/2.
-  bulkdensity = gss(nslabs) / (frames*shellvolume(radius,gssstep))
+  bulkdensity = gss(nslabs) / shellvolume(radius,gssstep)
   write(20,"('# Solvent density at bulk (largest distance) in sites/vol: ',e12.5 )") bulkdensity
   write(20,"('#')")
 
@@ -877,7 +879,7 @@ program g_solute_solvent
              &'#       5  Cumulative sum of sites (averaged over the number of frames) ',/,&
              &'#       6  GSS computed from random solvent distribution, not normalized ',/,&
              &'#       7  Cumulative sum of sites for the random distribution, averaged on frames.',/,&
-             &'#       8  Kirwood-Buff integral (int gss - 1) ')")
+             &'#       8  Kirwood-Buff integral computed from column 2 (int gss - 1) ')")
   write(20,"( '#',/,&      
    &'#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
    &t76,'6-GSS RND',t88,'7-CUMUL RND',t105,'8-KB INT' )" )
@@ -893,17 +895,18 @@ program g_solute_solvent
     ! Normalization by spherical shell of this radius
     gssnorm = gss(i) / ( bulkdensity*shellvolume(radius,gssstep) )
     ! Normalization by random distribution of molecules
-    x1 = float(gss(i))
-    y1 = float(gss_random(i))/gsslast
+    x1 = gss(i)
+    y1 = gss_random(i)/gsslast
     if ( y1 > 0. ) then
       z1 = x1 / y1
     else
       z1 = 0.
     end if
-    kbint = kbint + z1 - 1.e0
+    if ( gss_random(i) > 0. ) then
+      kbint = kbint + (gsssum - gsssum_random)/gss_random(i)
+    end if
     write(20,"( 8(tr2,f12.7) )")&
-    radius, z1, gssnorm/frames, float(gss(i))/frames, float(gsssum)/frames, &
-            float(gss_random(i))/frames, float(gsssum_random)/frames, kbint
+    radius, z1, gssnorm, gss(i), gsssum, gss_random(i), gsssum_random, kbint
   end do
   close(20)
 
