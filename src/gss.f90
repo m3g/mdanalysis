@@ -68,7 +68,7 @@ program g_solute_solvent
   real :: dummyr, xdcd(memory), ydcd(memory), zdcd(memory),&
           x1, y1, z1, time0, etime, tarray(2),&
           gssnorm, gssstep, &
-          density, dbox_x, dbox_y, dbox_z, cutoff, probeside, exclude_volume,&
+          density, dbox_x, dbox_y, dbox_z, cutoff, probeside, exclude_volume, solute_volume,&
           totalvolume, xmin(3), xmax(3), gssmax, kbint, kbintsphere, radius, bulkdensity
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
@@ -526,6 +526,7 @@ program g_solute_solvent
 
   ! Reading dcd file and computing the gss function
    
+  solute_volume = 0.e0
   iframe = 0
   do icycle = 1, ncycles 
    
@@ -628,6 +629,7 @@ program g_solute_solvent
         end do
       end do
       exclude_volume = noccupied * ( probeside**3 ) 
+      solute_volume = solute_volume + exclude_volume
 
       ! Computing the number of random solvent molecules that has to be
       ! generated
@@ -811,6 +813,7 @@ program g_solute_solvent
     end do
     write(*,*)
   end do
+  solute_volume = solute_volume / frames
   close(10)
   
   ! Open output file and writes all information of this run
@@ -831,6 +834,8 @@ program g_solute_solvent
              &'# Periodic boundary conditions: ',/,&
              &'# Periodic: ',l1,' Read from DCD: ',l1,/,&
              &'#',/,&
+             &'# Average solute volume estimate: ',f12.5,/,&
+             &'#',/,&
              &'# Number of atoms and mass of group 1: ',i6,f12.3,/,&
              &'# First and last atoms of group 1: ',i6,tr1,i6,/,&
              &'# Number of atoms and mass of group 2: ',i6,f12.3,/,&
@@ -842,6 +847,7 @@ program g_solute_solvent
              &psffile(1:length(psffile)),&
              &firstframe, lastframe, stride,&
              &periodic, readfromdcd, &
+             &solute_volume, &
              &nsolute, mass1, solute(1), solute(nsolute),& 
              &nsolvent, mass2, solvent(1), solvent(nsolvent)  
 
@@ -880,10 +886,11 @@ program g_solute_solvent
   &'#       6  Site count computed from random solvent distribution, averaged over frames.',/,&
   &'#       7  Cumulative sum of sites for the random distribution, averaged over frames.',/,&
   &'#       8  Kirwood-Buff integral computed from column 2 with volume estimated from col 6 (int V(r)*(gss-1) dr ',/,&
-  &'#       9  Kirwood-Buff integral computed from column 2 with spherical shell volume (int 4*pi*r^2*(gss-1) dr ')")
+  &'#       9  Kirwood-Buff integral computed from column 2 with spherical shell volume (int 4*pi*r^2*(gss-1) dr ',/,&
+  &'#      10  Kirwood-Buff integral of column 8 minus average solute volume ')")
   write(20,"( '#',/,&      
   &'#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
-  &t76,'6-GSS RND',t88,'7-CUMUL RND',t105,'8-KB RND',t119,'9-KB SPH' )" )
+  &t76,'6-GSS RND',t88,'7-CUMUL RND',t105,'8-KB RND',t119,'9-KB SPH',t132,'10-KB-VOL' )" )
 
   gsssum = 0
   gsssum_random = 0
@@ -906,8 +913,8 @@ program g_solute_solvent
     end if
     kbint = kbint + (z1 - 1.e0)*(gss_random(i)/bulkdensity)
     kbintsphere = kbintsphere + (z1 - 1.e0)*shellvolume(radius,gssstep)
-    write(20,"( 9(tr2,f12.7) )")&
-    radius, z1, gssnorm, gss(i), gsssum, gss_random(i), gsssum_random, kbint, kbintsphere
+    write(20,"( 10(tr2,f12.7) )")&
+    radius, z1, gssnorm, gss(i), gsssum, gss_random(i), gsssum_random, kbint, kbintsphere, kbint-solute_volume
   end do
   close(20)
 
