@@ -916,7 +916,7 @@ program g_solute_solvent
     if ( scalelast ) then
       y1 = gss_random(i)/gssscale
     else
-      y1 = gss_ramdom(i)
+      y1 = gss_random(i)
     end if
     if ( y1 > 0. ) then
       z1 = x1 / y1
