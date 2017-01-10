@@ -60,7 +60,7 @@ program g_solute_solvent
              nrsolvent, kframe, irad, nslabs, natoms_solvent,&
              nsmalld, nrsolvent2, ibox, jbox, kbox,&
              noccupied, nbdim(3), nboxes(3), maxsmalld, frames
-  real :: gsssum, gsssum_random, gsslast, convert
+  real :: gsssum, gsssum_random, gsslast, convert, gssscale
   double precision :: readsidesx, readsidesy, readsidesz, t
   real :: side(memory,3), mass1, mass2, seed,&
           cmx, cmy, cmz, beta, gamma, theta, random, axis(3)
@@ -70,13 +70,13 @@ program g_solute_solvent
           x1, y1, z1, time0, etime, tarray(2),&
           gssnorm, gssstep, &
           density, dbox_x, dbox_y, dbox_z, cutoff, probeside, exclude_volume, solute_volume,&
-          totalvolume, xmin(3), xmax(3), gssmax, kbint, kbintsphere, radius, bulkdensity
+          totalvolume, xmin(3), xmax(3), gssmax, kbint, kbintsphere, bulkdensity
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
                         output
   character(len=4) :: dummyc
   logical :: readfromdcd, dcdaxis, periodic, scalelast
-  real :: shellvolume
+  real :: shellvolume, shellradius
   
   ! Allocatable arrays
   
@@ -868,14 +868,16 @@ program g_solute_solvent
     stop
   end if
   gsslast = gss_random(nslabs)/gss(nslabs)
-  write(20,"('# Error in random normalization at large distances: ',f12.3,'%' )") (gsslast - 1.d0)*100
-  if ( scalelast ) then
-    write(20,"('# scalelast is true, so GSS/GSSRND (column 2) is divided by: ',f12.3 )") gsslast
-  end if
+  write(20,"('# Error in random normalization at largest distance: ',f12.3,'%' )") (gsslast - 1.d0)*100
 
-  radius = nslabs*gssstep - gssstep/2.
-  bulkdensity = gss(nslabs) / shellvolume(radius,gssstep)
-  write(20,"('# Solvent density at bulk (largest distance) in sites/A^3: ',f12.5 )") bulkdensity
+  gssscale = gss(nslabs)/shellvolume(nslabs,gssstep)
+  write(20,"('# Solvent density at largest distance slab (sites/A^3): ',f12.5 )") gssscale
+  gssscale = gssscale / bulkdensity
+  write(20,"('# Difference relative to estimated bulk density: ',f12.3,'%' )") (gssscale - 1.d0)*100
+  write(20,"('#')")
+  if ( scalelast ) then
+    write(20,"('# scalelast is true, so GSS/GSSRND (column 2) is divided by: ',f12.3 )") gssscale
+  end if
   write(20,"('#')")
 
   ! Output table
@@ -905,23 +907,23 @@ program g_solute_solvent
   kbintsphere = 0.e0
   do i = 1, nslabs
     if ( gss_random(i) == 0 ) cycle
-    radius = i*gssstep - gssstep/2.
     gsssum = gsssum + gss(i)
     gsssum_random = gsssum_random + gss_random(i)
     ! Normalization by spherical shell of this radius
-    gssnorm = gss(i) / ( bulkdensity*shellvolume(radius,gssstep) )
+    gssnorm = gss(i) / ( bulkdensity*shellvolume(i,gssstep) )
     ! Normalization by random distribution of molecules
     x1 = gss(i)
-    y1 = gss_random(i)/gsslast
+    y1 = gss_random(i)/gssscale
     if ( y1 > 0. ) then
       z1 = x1 / y1
     else
       z1 = 0.
     end if
     kbint = kbint + convert*(z1 - 1.e0)*(gss_random(i)/bulkdensity)
-    kbintsphere = kbintsphere + convert*(z1 - 1.e0)*shellvolume(radius,gssstep)
+    kbintsphere = kbintsphere + convert*(z1 - 1.e0)*shellvolume(i,gssstep)
     write(20,"( 10(tr2,f12.7) )")&
-    radius, z1, gssnorm, gss(i), gsssum, gss_random(i), gsssum_random, kbint, kbintsphere, kbint-convert*solute_volume
+    shellradius(i,gssstep), z1, gssnorm, gss(i), gsssum, gss_random(i), gsssum_random,&
+                            kbint, kbintsphere, kbint-convert*solute_volume
   end do
   close(20)
 
@@ -948,18 +950,34 @@ program g_solute_solvent
 
 end program g_solute_solvent
 
-! Computes the volume of the spherical shell of radius
-! 'radius', defined within [radius-step/2,radius+step,2].
+! Computes the volume of the spherical shell 
+! defined within [(i-1)*step,i*step]
 
-real function shellvolume(radius,step)
+real function shellvolume(i,step)
 
   implicit none
-  real :: radius, step
+  integer :: i
+  real :: step, rmin
   real, parameter :: fourthirdsofpi = (4./3.)*3.1415925655
 
-  shellvolume = fourthirdsofpi*( (radius+step/2)**3 - (radius-step/2)**3 )
+  rmin = (i-1)*step
+  shellvolume = fourthirdsofpi*( (rmin+step)**3 - rmin**3 )
 
 end function shellvolume
+
+! Compute the point in which the radius comprises half of the
+! volume of the shell
+
+real function shellradius(i,step)
+
+  implicit none
+  integer :: i
+  real :: step, rmin
+
+  rmin = (i-1)*step
+  shellradius = ( 0.5e0*( (rmin+step)**3 + rmin**3 ) )**(1.e0/3.d0)
+
+end function shellradius
 
 
 
