@@ -913,7 +913,11 @@ program g_solute_solvent
     gssnorm = gss(i) / ( bulkdensity*sphericalshellvolume(i,gssstep) )
     ! Normalization by random distribution of molecules
     x1 = gss(i)
-    y1 = gss_random(i)/gssscale
+    if ( scalelast ) then
+      y1 = gss_random(i)/gssscale
+    else
+      y1 = gss_ramdom(i)
+    end if
     if ( y1 > 0. ) then
       z1 = x1 / y1
     else
