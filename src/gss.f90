@@ -60,11 +60,12 @@ program g_solute_solvent
              nrsolvent, kframe, irad, nslabs, natoms_solvent,&
              nsmalld, nrsolvent2, ibox, jbox, kbox,&
              noccupied, nbdim(3), nboxes(3), maxsmalld, frames
-  real :: gsssum, gsssum_random, gsslast
+  real :: gsssum, gsssum_random, gsslast, convert
   double precision :: readsidesx, readsidesy, readsidesz, t
   real :: side(memory,3), mass1, mass2, seed,&
           cmx, cmy, cmz, beta, gamma, theta, random, axis(3)
   real, parameter :: twopi = 2.*3.1415925655
+  real, parameter :: mole = 6.022140857e23
   real :: dummyr, xdcd(memory), ydcd(memory), zdcd(memory),&
           x1, y1, z1, time0, etime, tarray(2),&
           gssnorm, gssstep, &
@@ -527,6 +528,7 @@ program g_solute_solvent
   ! Reading dcd file and computing the gss function
    
   solute_volume = 0.e0
+  bulkdensity = 0.e0
   iframe = 0
   do icycle = 1, ncycles 
    
@@ -637,6 +639,7 @@ program g_solute_solvent
       totalvolume = axis(1)*axis(2)*axis(3)
       nrsolvent2 = nrsolvent * int(totalvolume / ( totalvolume - exclude_volume ))
       nsolvent2 = nrsolvent2*natoms_solvent
+      bulkdensity = bulkdensity + nrsolvent2 / totalvolume
 
       ! Create random coordinates for 'nrsolvent2' solvent molecules, inside
       ! the box
@@ -731,8 +734,6 @@ program g_solute_solvent
       ! Computing the gss functions from distance data
       !
 
-      ! For each solvent residue, get the MINIMUM, MAXIMUM and AVERAGE distances to the solute
-    
       do i = 1, nrsolvent2
         mind(i) = cutoff + 1.e0
       end do
@@ -813,8 +814,9 @@ program g_solute_solvent
     end do
     write(*,*)
   end do
-  solute_volume = solute_volume / frames
   close(10)
+  solute_volume = solute_volume / frames
+  bulkdensity = bulkdensity / frames
   
   ! Open output file and writes all information of this run
 
@@ -834,7 +836,8 @@ program g_solute_solvent
              &'# Periodic boundary conditions: ',/,&
              &'# Periodic: ',l1,' Read from DCD: ',l1,/,&
              &'#',/,&
-             &'# Average solute volume estimate: ',f12.5,/,&
+             &'# Average solute volume estimate (A^3): ',f12.5,/,&
+             &'# Bulk solvent density estimated (sites/A^3): ',f12.5,/,&
              &'#',/,&
              &'# Number of atoms and mass of group 1: ',i6,f12.3,/,&
              &'# First and last atoms of group 1: ',i6,tr1,i6,/,&
@@ -847,7 +850,7 @@ program g_solute_solvent
              &psffile(1:length(psffile)),&
              &firstframe, lastframe, stride,&
              &periodic, readfromdcd, &
-             &solute_volume, &
+             &solute_volume, bulkdensity, &
              &nsolute, mass1, solute(1), solute(nsolute),& 
              &nsolvent, mass2, solvent(1), solvent(nsolvent)  
 
@@ -872,7 +875,7 @@ program g_solute_solvent
 
   radius = nslabs*gssstep - gssstep/2.
   bulkdensity = gss(nslabs) / shellvolume(radius,gssstep)
-  write(20,"('# Solvent density at bulk (largest distance) in sites/vol: ',e12.5 )") bulkdensity
+  write(20,"('# Solvent density at bulk (largest distance) in sites/A^3: ',f12.5 )") bulkdensity
   write(20,"('#')")
 
   ! Output table
@@ -885,12 +888,16 @@ program g_solute_solvent
   &'#       5  Cumulative sum of sites, averaged over the number of frames  ',/,&
   &'#       6  Site count computed from random solvent distribution, averaged over frames.',/,&
   &'#       7  Cumulative sum of sites for the random distribution, averaged over frames.',/,&
-  &'#       8  Kirwood-Buff integral computed from column 2 with volume estimated from col 6 (int V(r)*(gss-1) dr ',/,&
-  &'#       9  Kirwood-Buff integral computed from column 2 with spherical shell volume (int 4*pi*r^2*(gss-1) dr ',/,&
-  &'#      10  Kirwood-Buff integral of column 8 minus average solute volume ')")
+  &'#       8  Kirwood-Buff integral (cc/mol) computed from column 2 with volume estimated from col 6 (int V(r)*(gss-1) dr ',/,&
+  &'#       9  Kirwood-Buff integral (cc/mol) computed from column 2 with spherical shell volume (int 4*pi*r^2*(gss-1) dr ',/,&
+  &'#      10  Kirwood-Buff integral (cc/mol) of column 8 minus average solute volume ')")
   write(20,"( '#',/,&      
   &'#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
   &t76,'6-GSS RND',t88,'7-CUMUL RND',t105,'8-KB RND',t119,'9-KB SPH',t132,'10-KB-VOL' )" )
+
+  ! Conversion factor for KB integrals, from A^3 to cm^3/mol
+
+  convert = mole / 1.e24
 
   gsssum = 0
   gsssum_random = 0
@@ -911,10 +918,10 @@ program g_solute_solvent
     else
       z1 = 0.
     end if
-    kbint = kbint + (z1 - 1.e0)*(gss_random(i)/bulkdensity)
-    kbintsphere = kbintsphere + (z1 - 1.e0)*shellvolume(radius,gssstep)
+    kbint = kbint + convert*(z1 - 1.e0)*(gss_random(i)/bulkdensity)
+    kbintsphere = kbintsphere + convert*(z1 - 1.e0)*shellvolume(radius,gssstep)
     write(20,"( 10(tr2,f12.7) )")&
-    radius, z1, gssnorm, gss(i), gsssum, gss_random(i), gsssum_random, kbint, kbintsphere, kbint-solute_volume
+    radius, z1, gssnorm, gss(i), gsssum, gss_random(i), gsssum_random, kbint, kbintsphere, kbint-convert*solute_volume
   end do
   close(20)
 
@@ -950,7 +957,7 @@ real function shellvolume(radius,step)
   real :: radius, step
   real, parameter :: fourthirdsofpi = (4./3.)*3.1415925655
 
-  shellvolume = fourthirdsofpi*( 2*step*(3*radius**2+step**2) ) 
+  shellvolume = fourthirdsofpi*( (radius+step/2)**3 - (radius-step/2)**3 )
 
 end function shellvolume
 
