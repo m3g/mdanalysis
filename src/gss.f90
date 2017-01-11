@@ -817,7 +817,7 @@ program g_solute_solvent
   close(10)
   solute_volume = solute_volume / frames
   bulkdensity = bulkdensity / frames
-  
+
   ! Open output file and writes all information of this run
 
   !
@@ -894,8 +894,8 @@ program g_solute_solvent
   &'#       9  Kirwood-Buff integral (cc/mol) computed from column 2 with spherical shell volume (int 4*pi*r^2*(gss-1) dr ',/,&
   &'#      10  Kirwood-Buff integral (cc/mol) of column 8 minus average solute volume ')")
   write(20,"( '#',/,&      
-  &'#',t5,'1-DISTANCE',t17,'2-GSS/GSSRND',t32,'3-GSS/SPHER',t52,'4-GSS',t64,'5-CUMUL',&
-  &t76,'6-GSS RND',t88,'7-CUMUL RND',t105,'8-KB RND',t119,'9-KB SPH',t132,'10-KB-VOL' )" )
+  &'#',t5,'1-DISTANCE',t17,'2-GSS',t32,'3-GSS/SPHER',t52,'4-COUNT',t64,'5-CUMUL',&
+  &t76,'6-COUNT RND',t88,'7-CUMUL RND',t105,'8-KB RND',t119,'9-KB SPH',t132,'10-KB-VOL' )" )
 
   ! Conversion factor for KB integrals, from A^3 to cm^3/mol
 
