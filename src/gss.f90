@@ -123,7 +123,7 @@ program g_solute_solvent
   gssmax = 20.
   density = 1.
   probeside = 2.
-  scalelast = .true.
+  scalelast = .false.
   
   ! Open input file and read parameters
   
@@ -913,15 +913,14 @@ program g_solute_solvent
     gssnorm = gss(i) / ( bulkdensity*sphericalshellvolume(i,gssstep) )
     ! Normalization by random distribution of molecules
     x1 = gss(i)
-    if ( scalelast ) then
-      y1 = gss_random(i)/gssscale
-    else
-      y1 = gss_random(i)
-    end if
+    y1 = gss_random(i)
     if ( y1 > 0. ) then
       z1 = x1 / y1
     else
       z1 = 0.
+    end if
+    if ( scalelast ) then
+      z1 = z1 / gssscale
     end if
     kbint = kbint + convert*(z1 - 1.e0)*shellvolume(gss_random(i),bulkdensity)
     kbintsphere = kbintsphere + convert*(z1 - 1.e0)*sphericalshellvolume(i,gssstep)
