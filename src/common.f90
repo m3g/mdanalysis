@@ -806,6 +806,7 @@ subroutine getnframes(iunit,nframes,dcdaxis)
   double precision :: side
   character(len=4) :: char
 
+  write(*,*) ' Reading DCD file to determine number of frames ... '
   nframes = 0
   do
     if(dcdaxis) then 

@@ -854,7 +854,7 @@ program g_solute_solvent
              &nsolute, mass1, solute(1), solute(nsolute),& 
              &nsolvent, mass2, solvent(1), solvent(nsolvent)  
 
-  ! Averaget counts over the number of frames
+  ! Average counts over the number of frames
 
   do i = 1, nslabs
     gss(i) = gss(i) / frames
