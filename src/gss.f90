@@ -895,7 +895,7 @@ program g_solute_solvent
   &'#      10  Kirwood-Buff integral (cc/mol) of column 8 minus average solute volume ')")
   write(20,"( '#',/,&      
   &'#',t5,'1-DISTANCE',t24,'2-GSS',t32,'3-GSS/SPHER',t50,'4-COUNT',t64,'5-CUMUL',&
-  &t74,'6-COUNT RND',t88,'7-CUMUL RND',t105,'8-KB RND',t119,'9-KB SPH',t132,'10-KB-VOL' )" )
+  &t74,'6-COUNT RND',t88,'7-CUMUL RND',t105,'8-KB RND',t119,'9-KB SPH' )" )
 
   ! Conversion factor for KB integrals, from A^3 to cm^3/mol
 
@@ -920,9 +920,9 @@ program g_solute_solvent
     if ( scalelast ) gss_norm = gss_norm / gssscale
     kbint = kbint + convert*(gss_norm - 1.e0)*shellvolume(gss_random(i),bulkdensity)
     kbintsphere = kbintsphere + convert*(gss_norm - 1.e0)*sphericalshellvolume(i,gssstep)
-    write(20,"( 10(tr2,f12.7) )")&
+    write(20,"( 9(tr2,f12.7) )")&
     shellradius(i,gssstep), gss_norm, gss_sphere, gss(i), gsssum, gss_random(i), gsssum_random,&
-                            kbint, kbintsphere, kbint-convert*solute_volume
+                            kbint, kbintsphere
   end do
   close(20)
 
