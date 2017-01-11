@@ -68,7 +68,7 @@ program g_solute_solvent
   real, parameter :: mole = 6.022140857e23
   real :: dummyr, xdcd(memory), ydcd(memory), zdcd(memory),&
           x1, y1, z1, time0, etime, tarray(2),&
-          gssnorm, gssstep, &
+          gss_norm, gss_sphere, gssstep, &
           density, dbox_x, dbox_y, dbox_z, cutoff, probeside, exclude_volume, solute_volume,&
           totalvolume, xmin(3), xmax(3), gssmax, kbint, kbintsphere, bulkdensity
   character(len=200) :: groupfile, line, record, value, keyword,&
@@ -910,22 +910,18 @@ program g_solute_solvent
     gsssum = gsssum + gss(i)
     gsssum_random = gsssum_random + gss_random(i)
     ! Normalization by spherical shell of this radius
-    gssnorm = gss(i) / ( bulkdensity*sphericalshellvolume(i,gssstep) )
+    gss_sphere = gss(i) / ( bulkdensity*sphericalshellvolume(i,gssstep) ) 
     ! Normalization by random distribution of molecules
-    x1 = gss(i)
-    y1 = gss_random(i)
-    if ( y1 > 0. ) then
-      z1 = x1 / y1
+    if ( gss_random(i) > 0. ) then
+      gss_norm = gss(i) / gss_random(i)
     else
-      z1 = 0.
+      gss_norm = 0.
     end if
-    if ( scalelast ) then
-      z1 = z1 / gssscale
-    end if
-    kbint = kbint + convert*(z1 - 1.e0)*shellvolume(gss_random(i),bulkdensity)
-    kbintsphere = kbintsphere + convert*(z1 - 1.e0)*sphericalshellvolume(i,gssstep)
+    if ( scalelast ) gss_norm = gss_norm / gssscale
+    kbint = kbint + convert*(gss_norm - 1.e0)*shellvolume(gss_random(i),bulkdensity)
+    kbintsphere = kbintsphere + convert*(gss_norm - 1.e0)*sphericalshellvolume(i,gssstep)
     write(20,"( 10(tr2,f12.7) )")&
-    shellradius(i,gssstep), z1, gssnorm, gss(i), gsssum, gss_random(i), gsssum_random,&
+    shellradius(i,gssstep), gss_norm, gss_sphere, gss(i), gsssum, gss_random(i), gsssum_random,&
                             kbint, kbintsphere, kbint-convert*solute_volume
   end do
   close(20)
