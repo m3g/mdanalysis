@@ -52,13 +52,13 @@ program g_solute_solvent
 
   implicit none
   integer, parameter :: memory=15000000
-  integer :: natom, nsolute, nsolvent, nexclude, isolute, isolvent, nsolvent2, &
-             iexclude, narg, length, firstframe, lastframe, stride, nclass,&
+  integer :: natom, nsolute, nsolvent, isolute, isolvent, &
+             narg, length, firstframe, lastframe, stride, nclass,&
              nframes, dummyi, i, ntotat, memframes, ncycles, memlast,&
              j, iframe, icycle, nfrcycle, iatom, k, ii, jj, &
-             status, keystatus, ndim, iargc, lastatom, nres, nrsolute, nrexclude,&
+             status, keystatus, ndim, iargc, lastatom, nres, nrsolute,&
              nrsolvent, kframe, irad, nslabs, natoms_solvent,&
-             nsmalld, nrsolvent2, ibox, jbox, kbox,&
+             nsmalld, ibox, jbox, kbox,&
              noccupied, nbdim(3), nboxes(3), maxsmalld, frames
   real :: gsssum, gsssum_random, gsslast, convert, gssscale
   double precision :: readsidesx, readsidesy, readsidesz, t
@@ -69,8 +69,9 @@ program g_solute_solvent
   real :: dummyr, xdcd(memory), ydcd(memory), zdcd(memory),&
           x1, y1, z1, time0, etime, tarray(2),&
           gss_norm, gss_sphere, gssstep, &
-          density, dbox_x, dbox_y, dbox_z, cutoff, probeside, exclude_volume, solute_volume,&
+          density, dbox_x, dbox_y, dbox_z, cutoff, probeside, solute_volume,&
           totalvolume, xmin(3), xmax(3), gssmax, kbint, kbintsphere, bulkdensity
+  real :: bulkdensity_average
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
                         output
@@ -80,11 +81,11 @@ program g_solute_solvent
 
   ! Allocatable arrays
   
-  integer, allocatable :: solute(:), solvent(:), resid(:), solute2(:), solvent2(:), &
-                          natres(:), fatres(:), fatrsolute(:), fatrsolvent(:), exclude(:),&
-                          fatrexclude(:),&
-                          nrsolv(:), nrsolv2(:), ismalld(:)
-  real, allocatable :: gss(:), gss_random(:)
+  integer, allocatable :: solute(:), solvent(:), resid(:), solute2(:), &
+                          natres(:), fatres(:), fatrsolute(:), fatrsolvent(:), &
+                          nrsolv(:), ismalld(:)
+  real, allocatable :: gss(:)
+  real, allocatable :: shellvolume_average(:), gss_average(:)
   real, allocatable :: eps(:), sig(:), q(:), e(:), s(:), mass(:),&
                        solvent_molecule(:,:), &
                        xref(:), yref(:), zref(:), xrnd(:), yrnd(:), zrnd(:),&
@@ -202,7 +203,6 @@ program g_solute_solvent
       output = value(record)
       write(*,*) ' GSS output file name: ', output(1:length(output))
     else if(keyword(record) == 'solute' .or. &
-            keyword(record) == 'exclude' .or. &
             keyword(record) == 'solvent') then
       write(*,"(a,/,a)") ' ERROR: The options solute and solvent must be used ',&
                          '        with the gss.sh script, not directly. '
@@ -230,14 +230,13 @@ program g_solute_solvent
   
   ! Reading the header of psf file
   
-  call getdim(psffile,inputfile,ndim)
-  allocate( eps(ndim), sig(ndim), q(ndim), e(ndim), s(ndim), mass(ndim),&
-            segat(ndim), resat(ndim), classat(ndim), typeat(ndim), class(ndim),&
-            resid(ndim), natres(ndim), fatres(ndim), fatrsolute(ndim),&
-            fatrsolvent(ndim), nrsolv(ndim), fatrexclude(ndim),&
-            nrsolv2(ndim*2), x(ndim*2), y(ndim*2), z(ndim*2), solvent2(ndim*2),&
-            solute2(ndim), mind(ndim*2) )
-  
+  call getdim(psffile,inputfile,natom)
+  allocate( eps(natom), sig(natom), q(natom), e(natom), s(natom), mass(natom),&
+            segat(natom), resat(natom), classat(natom), typeat(natom), class(natom),&
+            resid(natom), natres(natom), fatres(natom), fatrsolute(natom),&
+            fatrsolvent(natom), nrsolv(natom), &
+            solute2(ndim), mind(ndim) )
+
   ! Reading parameter files to get the vdW sigmas for the definition of exclusion
   ! zones
   
@@ -264,7 +263,7 @@ program g_solute_solvent
   end if
   
   write(*,*) ' Number of volume slabs: ', nslabs
-  allocate( gss(nslabs), gss_random(nslabs) )
+  allocate( gss_average(nslabs), gss(nslabs), shellvolume_average(nslabs) )
 
   gssstep = gssmax / float(nslabs)
          
@@ -300,13 +299,12 @@ program g_solute_solvent
   write(*,*) ' Number of residues in PSF file: ', nres
   write(*,*)
   
-  ! Read solute and solvent and exclude information from file
+  ! Read solute and solvent information from file
   ! First reading the size of the groups to allocate arrays
 
   open(10,file=groupfile,action='read')
   nsolute = 0
   nsolvent = 0
-  nexclude = 0
   do 
     read(10,"( a200 )",iostat=status) line
     if(status /= 0) exit
@@ -317,19 +315,15 @@ program g_solute_solvent
       if(line(63:66) == '2.00') then      
         nsolvent = nsolvent + 1        
       end if
-      if(line(57:60) == '1.00') then
-        nexclude = nexclude + 1        
-      end if
     end if     
   end do
-  if ( nsolute < 1 .or. nsolvent < 1 .or. nexclude < 1 ) then
-    write(*,*) ' ERROR: No atom selected for solute, solvent, or exclude. '
+  if ( nsolute < 1 .or. nsolvent < 1 ) then
+    write(*,*) ' ERROR: No atom selected for solute or solvent. '
     write(*,*) '        nsolute = ', nsolute
     write(*,*) '        nsolvent = ', nsolvent
-    write(*,*) '        nexclude = ', nexclude
     stop
   end if
-  allocate ( solute(nsolute), solvent(nsolvent), exclude(nexclude) )
+  allocate ( solute(nsolute), solvent(nsolvent) )
   close(10)
   
   ! Now reading reading the group atoms
@@ -337,7 +331,6 @@ program g_solute_solvent
   open(10,file=groupfile,action='read')
   isolute = 0
   isolvent = 0
-  iexclude = 0
   mass1 = 0.
   mass2 = 0.
   iatom = 0
@@ -363,17 +356,10 @@ program g_solute_solvent
         mass2 = mass2 + mass(iatom)
       end if
 
-      ! Read atoms belonging to solvent
-
-      if(line(57:60) == '1.00') then
-        iexclude = iexclude + 1        
-        exclude(iexclude) = iatom
-      end if
-
     end if     
   end do
   close(10)
-  lastatom = max0(solute(nsolute),solvent(nsolvent),exclude(nexclude))
+  lastatom = max0(solute(nsolute),solvent(nsolvent))
 
   ! Finding the number of atoms and the first atom of each residue
   
@@ -409,19 +395,14 @@ program g_solute_solvent
     end if
     nrsolv(i) = nrsolvent
   end do
-  j = 0
-  nrexclude = 0
-  do i = 1, nexclude
-    if(resid(exclude(i)).gt.j) then
-      nrexclude = nrexclude + 1 
-      fatrexclude(nrexclude) = fatres(resid(exclude(i)))
-      j = resid(exclude(i))
-    end if
-  end do
 
   ! This is for the initialization of the smalldistances routine
 
-  allocate( ismalld(1), dsmalld(1) )
+  nrandom = 2*nrsolvent
+  maxsmalld = nsolute*nrandom
+  allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
+  maxatom = max(nsolute+nrandom,natom)
+  allocate( x(maxatom), y(maxatom), z(maxatom) )
 
   ! Output some group properties for testing purposes
   
@@ -435,13 +416,6 @@ program g_solute_solvent
   write(*,*) ' Last atom of solvent: ', solvent(nsolvent)
   write(*,*) ' Number of residues in solvent: ', nrsolvent
   write(*,*) ' Mass of solvent: ', mass2
-  write(*,*) 
-  write(*,*) ' Excluded volume information: ' 
-  write(*,*) ' Probe side for solute volume estimation: ', probeside
-  write(*,*) ' Number of atoms of excluded volume: ', nexclude
-  write(*,*) ' First atom of excluded volume: ', exclude(1)
-  write(*,*) ' Last atom of excluded volume: ', exclude(nexclude)
-  write(*,*) ' Number of residues in exclude: ', nrexclude
 
   ! Check if the solvent atoms have obvious reading problems
   
@@ -514,9 +488,10 @@ program g_solute_solvent
   ! Reseting the gss distribution function
   
   do i = 1, nslabs
-    gss(i) = 0.e0
-    gss_random(i) = 0.e0
+    gss_average(i) = 0.e0
+    shellvolume_average(i) = 0.e0
   end do
+  bulkdensity_average = 0.e0
 
   ! Initializing hasatoms array
 
@@ -527,8 +502,6 @@ program g_solute_solvent
 
   ! Reading dcd file and computing the gss function
    
-  solute_volume = 0.e0
-  bulkdensity = 0.e0
   iframe = 0
   do icycle = 1, ncycles 
    
@@ -577,184 +550,8 @@ program g_solute_solvent
       axis(2) = side(kframe,2) 
       axis(3) = side(kframe,3) 
 
-      ! Normalization: creates a box with random coordinates for the solvent molecules, excluding
-      ! the excluded selection volume. The gss is computed for this random box independently, and this is 
-      ! the normalization for the gss that allows for the computation of the potential of mean
-      ! force.
-
-      ! 
-      ! Estimate the volume of the solute in this frame
       !
-
-      call getmaxmin(nexclude,exclude,iatom,xdcd,ydcd,zdcd,xmin,xmax,.true.)
-      nboxes(1) = max(1,int((xmax(1)-xmin(1))/probeside))
-      dbox_x = max((xmax(1)-xmin(1)) / nboxes(1),probeside)
-      nboxes(2) = max(1,int((xmax(2)-xmin(2))/probeside))
-      dbox_y = max((xmax(2)-xmin(2)) / nboxes(2),probeside)
-      nboxes(3) = max(1,int((xmax(3)-xmin(3))/probeside))
-      dbox_z = max((xmax(3)-xmin(3)) / nboxes(3),probeside)
-      if ( nboxes(1) > nbdim(1) .or. &
-           nboxes(2) > nbdim(2) .or. &
-           nboxes(3) > nbdim(3) ) then
-         deallocate( hasatoms )
-         nbdim(1) = nboxes(1)
-         nbdim(2) = nboxes(2)
-         nbdim(3) = nboxes(3)
-         allocate( hasatoms(0:nbdim(1)+1,0:nbdim(2)+1,0:nbdim(3)+1) )
-      end if
-      do i = 0, nboxes(1)+1
-        do j = 0, nboxes(2)+1
-          do k = 0, nboxes(3)+1
-            hasatoms(i,j,k) = .false.
-          end do
-        end do
-      end do
-      do i = 1, nexclude
-        ii = iatom + exclude(i)
-        x1 = xdcd(ii)
-        y1 = ydcd(ii)
-        z1 = zdcd(ii)
-        ibox = int( (x1 - xmin(1)) / dbox_x ) + 1
-        jbox = int( (y1 - xmin(2)) / dbox_y ) + 1
-        kbox = int( (z1 - xmin(3)) / dbox_z ) + 1
-        if ( ibox == nbdim(1)+1 ) ibox = nbdim(1)
-        if ( jbox == nbdim(2)+1 ) jbox = nbdim(2)
-        if ( kbox == nbdim(3)+1 ) kbox = nbdim(3)
-        hasatoms(ibox,jbox,kbox) = .true.
-      end do
-      noccupied = 0
-      do i = 0, nboxes(1)+1
-        do j = 0, nboxes(2)+1 
-          do k = 0, nboxes(3)+1 
-            if( hasatoms(i,j,k) ) noccupied = noccupied + 1
-          end do
-        end do
-      end do
-      exclude_volume = noccupied * ( probeside**3 ) 
-      solute_volume = solute_volume + exclude_volume
-
-      ! Computing the number of random solvent molecules that has to be
-      ! generated
-
-      totalvolume = axis(1)*axis(2)*axis(3)
-      nrsolvent2 = nrsolvent * int(totalvolume / ( totalvolume - exclude_volume ))
-      nsolvent2 = nrsolvent2*natoms_solvent
-      bulkdensity = bulkdensity + nrsolvent2 / totalvolume
-
-      ! Create random coordinates for 'nrsolvent2' solvent molecules, inside
-      ! the box
-
-      do isolvent = 1, nrsolvent2
-
-        ! First, pick randomly a solvent molecule from the box, to minimize conformational
-        ! biases of the solvent molecules
-    
-        ii = (nrsolvent-1)*int(random(seed)) + 1
-    
-        ! Save the coordinates of this molecule in this frame in the solvent_molecule array
-    
-        jj = iatom + solvent(1) + natoms_solvent*(ii-1)
-        do i = 1, natoms_solvent
-          solvent_molecule(i,1) = xdcd(jj+i-1)
-          solvent_molecule(i,2) = ydcd(jj+i-1)
-          solvent_molecule(i,3) = zdcd(jj+i-1)
-        end do
-  
-        ! Put molecule in its center of mass for it to be the reference coordinate for the 
-        ! random coordinates that will be generated
-  
-        cmx = 0.
-        cmy = 0.
-        cmz = 0.
-        do i = 1, natoms_solvent
-          cmx = cmx + solvent_molecule(i,1)
-          cmy = cmy + solvent_molecule(i,2)
-          cmz = cmz + solvent_molecule(i,3)
-        end do
-        cmx = cmx / float(natoms_solvent)
-        cmy = cmy / float(natoms_solvent)
-        cmz = cmz / float(natoms_solvent)
-        do i = 1, natoms_solvent
-          xref(i) = solvent_molecule(i,1) - cmx
-          yref(i) = solvent_molecule(i,2) - cmy
-          zref(i) = solvent_molecule(i,3) - cmz
-        end do
-  
-        ! Generate a random position for this molecule
-  
-        cmx = -axis(1)/2. + random(seed)*axis(1) 
-        cmy = -axis(2)/2. + random(seed)*axis(2) 
-        cmz = -axis(3)/2. + random(seed)*axis(3) 
-        beta = random(seed)*twopi
-        gamma = random(seed)*twopi
-        theta = random(seed)*twopi
-        call compcart(natoms_solvent,xref,yref,zref,xrnd,yrnd,zrnd,&
-                      cmx,cmy,cmz,beta,gamma,theta)
-
-        ! Add this molecule to x, y, z arrays
-
-        do i = 1, natoms_solvent
-          call image(xrnd(i),yrnd(i),zrnd(i),side(kframe,1),side(kframe,2),side(kframe,3))
-          ii = nsolute + (isolvent-1)*natoms_solvent + i
-          x(ii) = xrnd(i)
-          y(ii) = yrnd(i)
-          z(ii) = zrnd(i)
-          solvent2(ii-nsolute) = ii
-          ! Annotate to which molecule this atom pertains
-          nrsolv2(ii-nsolute) = isolvent
-        end do
-         
-      end do
-
-      ! Add solute coordinates to x, y and z arrays
-
-      do isolute = 1, nsolute
-        ii = iatom + solute(isolute)
-        x1 = xdcd(ii)
-        y1 = ydcd(ii)
-        z1 = zdcd(ii)
-        if ( periodic ) call image(x1,y1,z1,axis(1),axis(2),axis(3)) 
-        x(isolute) = x1
-        y(isolute) = y1
-        z(isolute) = z1
-        solute2(isolute) = isolute
-      end do
-
-      ! Now compute all the distances that are smaller than the desired cutoff
-
-      maxsmalld = nsolute*nsolvent
-      if ( maxsmalld > size(dsmalld) ) then
-        deallocate( ismalld, dsmalld )
-        allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
-      end if
-      call smalldistances(nsolute,solute2,nsolvent2,solvent2,x,y,z,cutoff,&
-                          nsmalld,ismalld,dsmalld,axis,maxsmalld)
-      
-      !
-      ! Computing the gss functions from distance data
-      !
-
-      do i = 1, nrsolvent2
-        mind(i) = cutoff + 1.e0
-      end do
-      do i = 1, nsmalld
-        isolvent = nrsolv2(ismalld(i))
-        if ( dsmalld(i) < mind(isolvent) ) then
-          mind(isolvent) = dsmalld(i)
-        end if
-      end do
-
-      ! Summing up current data to the gss histogram
-
-      do i = 1, nrsolvent2
-        irad = int(float(nslabs)*mind(i)/gssmax)+1
-        if ( irad <= nslabs ) then
-          gss_random(irad) = gss_random(irad) + 1.e0
-        end if
-      end do
-
-      !
-      ! Now computing the GSS data from the simulation itself
+      ! Computing the GSS data the simulation
       !
 
       do i = 1, nsolute
@@ -772,11 +569,6 @@ program g_solute_solvent
 
       ! Compute all distances that are smaller than the cutoff
 
-      maxsmalld = nsolute*nsolvent
-      if ( maxsmalld > size(dsmalld) ) then
-        deallocate( ismalld, dsmalld )
-        allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
-      end if
       call smalldistances(nsolute,solute,nsolvent,solvent,x,y,z,cutoff,&
                           nsmalld,ismalld,dsmalld,axis,maxsmalld)
 
@@ -798,11 +590,77 @@ program g_solute_solvent
 
       ! Summing up current data to the gss histogram
 
+      do i = 1, nslabs
+        gss(i) = 0.e0
+      end do
       do i = 1, nrsolvent
         irad = int(float(nslabs)*mind(i)/gssmax)+1
         if( irad <= nslabs ) then
           gss(irad) = gss(irad) + 1.e0
         end if
+      end do
+
+      !
+      ! Computing volumes for normalization
+      !
+
+      do i = 1, nsolute
+        ii = iatom + solute(i)
+        x(i) = xdcd(ii)
+        y(i) = ydcd(ii)
+        z(i) = zdcd(ii)
+        solute2(i) = i
+      end do
+
+      ! Generate nrandom random points
+
+      ii = nsolute
+      do i = 1, nrandom 
+        ii + 1
+        x(ii) = -axis(1)/2. + random(seed)*axis(1) 
+        y(ii) = -axis(2)/2. + random(seed)*axis(2) 
+        z(ii) = -axis(3)/2. + random(seed)*axis(3) 
+        irandom(i) = ii
+      end do
+
+      ! Computes distances which are smaller than the cutoff
+      
+      call smalldistances(nsolute,solute2,nrandom,irandom,x,y,z,cutoff,&
+                          nsmalld,ismalld,dsmalld,axis,maxsmalld)
+      
+      ! Estimating volume of slabs from count of random points
+
+      do i = 1, nsmalld
+        irad = int(float(nslabs)*dsmalld(i)/gssmax)+1
+        if ( irad <= nslabs ) then
+          random_count(irad) = random_count(irad) + 1.e0
+        end if
+      end do
+
+      ! Converting counts to volume
+
+      totalvolume = axis(1)*axis(2)*axis(3)
+      do i = 1, nslabs
+        shellvolume(i) = random_count(i)*totalvolume / nrandom
+        shellvolume_average(i) = shellvolume_average(i) + shellvolume(i)
+      end do
+
+      ! Estimating the bulk density from site count at large distances
+
+      gsssum = 0.e0
+      totalvolume = 0.e0
+      do i = ibulk, nslabs
+        gsssum = gsssum + gss(i)
+        totalvolume = totalvolume + shellvolume(i)
+      end do
+      bulkdensity = gsssum / totalvolume
+      bulkdensity_average = bulkdensity_average + bulkdensity
+
+      ! Normalizing the gss distribution at this frame
+      
+      do i = 1, nlsabs
+        gss(i) = gss(i) / ( bulkdensity*shellvolume(i) )
+        gss_average(i) = gss_average(i) + gss(i)
       end do
 
       ! Print progress
@@ -815,8 +673,14 @@ program g_solute_solvent
     write(*,*)
   end do
   close(10)
-  solute_volume = solute_volume / frames
-  bulkdensity = bulkdensity / frames
+
+  ! Averaging results on the number of frames
+
+  bulkdensity_average = bulkdensity_average / frames
+  do i = 1, nslabs
+    gss_average(i) = gss_average(i) / frames
+    shellvolume_average(i) = shellvolume_average(i) / frames
+  end do
 
   ! Open output file and writes all information of this run
 
@@ -853,13 +717,6 @@ program g_solute_solvent
              &solute_volume, bulkdensity, &
              &nsolute, mass1, solute(1), solute(nsolute),& 
              &nsolvent, mass2, solvent(1), solvent(nsolvent)  
-
-  ! Average counts over the number of frames
-
-  do i = 1, nslabs
-    gss(i) = gss(i) / frames
-    gss_random(i) = gss_random(i) / frames
-  end do
 
   ! Compute error of gssrand distribution at large distance (expected to be 1.00)
 
