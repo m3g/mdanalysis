@@ -76,8 +76,8 @@ program g_solute_solvent
                         output
   character(len=4) :: dummyc
   logical :: readfromdcd, dcdaxis, periodic, scalelast
-  real :: shellvolume, sphericalshellvolume, shellradius
-  
+  real :: shellvolume, sphericalshellvolume, shellradius, dshift, sphereradiusfromshellvolume 
+
   ! Allocatable arrays
   
   integer, allocatable :: solute(:), solvent(:), resid(:), solute2(:), solvent2(:), &
@@ -892,10 +892,10 @@ program g_solute_solvent
   &'#       7  Cumulative sum of sites for the random distribution, averaged over frames.',/,&
   &'#       8  Kirwood-Buff integral (cc/mol) computed from column 2 with volume estimated from col 6 (int V(r)*(gss-1) dr ',/,&
   &'#       9  Kirwood-Buff integral (cc/mol) computed from column 2 with spherical shell volume (int 4*pi*r^2*(gss-1) dr ',/,&
-  &'#      10  Kirwood-Buff integral (cc/mol) of column 8 minus average solute volume ')")
+  &'#      10  Spherical shifted minimum distance ')")
   write(20,"( '#',/,&      
   &'#',t5,'1-DISTANCE',t24,'2-GSS',t32,'3-GSS/SPHER',t50,'4-COUNT',t64,'5-CUMUL',&
-  &t74,'6-COUNT RND',t88,'7-CUMUL RND',t105,'8-KB RND',t119,'9-KB SPH' )" )
+  &t74,'6-COUNT RND',t88,'7-CUMUL RND',t105,'8-KB RND',t119,'9-KB SPH',t131,'10-D SHIFT' )" )
 
   ! Conversion factor for KB integrals, from A^3 to cm^3/mol
 
@@ -917,12 +917,13 @@ program g_solute_solvent
     else
       gss_norm = 0.
     end if
+    dshift = sphereradiusfromshellvolume(gss_random(i)/bulkdensity,gssstep)
     if ( scalelast ) gss_norm = gss_norm / gssscale
     kbint = kbint + convert*(gss_norm - 1.e0)*shellvolume(gss_random(i),bulkdensity)
     kbintsphere = kbintsphere + convert*(gss_norm - 1.e0)*sphericalshellvolume(i,gssstep)
-    write(20,"( 9(tr2,f12.7) )")&
+    write(20,"( 10(tr2,f12.7) )")&
     shellradius(i,gssstep), gss_norm, gss_sphere, gss(i), gsssum, gss_random(i), gsssum_random,&
-                            kbint, kbintsphere
+                            kbint, kbintsphere, dshift
   end do
   close(20)
 
@@ -989,6 +990,21 @@ real function shellradius(i,step)
   shellradius = ( 0.5e0*( (rmin+step)**3 + rmin**3 ) )**(1.e0/3.e0)
 
 end function shellradius
+
+! Computes the radius that corresponds to a spherical shell of
+! a given volume
+
+real function  sphereradiusfromshellvolume(volume,step)
+ 
+  implicit none
+  real :: volume, step, rmin
+  real, parameter :: pi = 3.1415925655
+  real, parameter :: fourthirdsofpi = (4./3.)*3.1415925655
+  
+  rmin = (sqrt(3*pi)*sqrt(3*step*volume-pi*step**4)-3*pi*step**2)/(6*pi*step)
+  sphereradiusfromshellvolume = ( 0.5e0*( volume/fourthirdsofpi + 2*rmin**3 ) )**(1.e0/3.e0)
+
+end function sphereradiusfromshellvolume
 
 
 
