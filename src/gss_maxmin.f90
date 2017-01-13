@@ -472,14 +472,7 @@ program g_solute_solvent_old
   
   write(*,*)
   write(*,*) ' Number of atoms as specified in the dcd file: ',ntotat     
-  call getnframes(10,nframes,dcdaxis)
-  write(*,*) ' Total number of frames in this dcd file: ', nframes
-  if(nframes < lastframe) then
-    write(*,*) ' ERROR: lastframe greater than the number of '
-    write(*,*) '        frames of the dcd file. '
-    stop
-  end if
-  if(lastframe == 0) lastframe = nframes    
+  call getnframes(10,nframes,dcdaxis,lastframe)
   if(ntotat /= natom) then
     write(*,"(a,/,a)") ' ERROR: Number of atoms in the dcd file does not',&
                       &'        match the number of atoms in the psf file'

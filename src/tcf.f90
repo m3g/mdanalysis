@@ -309,7 +309,7 @@ do idcd = 1, ndcd
   read(10) dummyc, nframes(idcd), (dummyi,i=1,8), dummyr, (dummyi,i=1,9)
   read(10) dummyi, dummyr
   read(10) ntotat
-  call getnframes(10,nframes(idcd),dcdaxis)
+  call getnframes(10,nframes(idcd),dcdaxis,lastframe)
   ntotframes = ntotframes + nframes(idcd)
   record2 = dcdfile(idcd)
   write(*,*) ' DCDfile: ', record2(1:length(record2))

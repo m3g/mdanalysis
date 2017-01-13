@@ -797,11 +797,11 @@ end subroutine getmaxmin
 ! DCD comes open with header read before, and return
 ! at the same point
 !
-subroutine getnframes(iunit,nframes,dcdaxis)
+subroutine getnframes(iunit,nframes,dcdaxis,lastframe)
 
   integer :: iunit, nframes, status
   logical :: dcdaxis
-  integer :: i
+  integer :: i, lastframe
   real :: x
   double precision :: side
   character(len=4) :: char
@@ -820,11 +820,20 @@ subroutine getnframes(iunit,nframes,dcdaxis)
     read(iunit,iostat=status) x
     if ( status /= 0 ) exit
     nframes = nframes + 1
+    if ( lastframe /= 0 .and. nframes == lastframe ) exit
   end do
   rewind(iunit)
   read(iunit) char
   read(iunit) i
   read(iunit) i
+
+  write(*,*) ' Total number of frames to read in this dcd file: ', nframes
+  if(nframes < lastframe) then
+    write(*,*) ' ERROR: lastframe greater than the number of '
+    write(*,*) '        frames of the dcd file. '
+    stop
+  end if
+  if(lastframe == 0) lastframe = nframes
 
 end subroutine getnframes
 

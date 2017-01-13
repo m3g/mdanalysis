@@ -52,40 +52,46 @@ program g_solute_solvent
 
   implicit none
   integer, parameter :: memory=15000000
+  integer :: maxatom, nrandom
   integer :: natom, nsolute, nsolvent, isolute, isolvent, &
              narg, length, firstframe, lastframe, stride, nclass,&
              nframes, dummyi, i, ntotat, memframes, ncycles, memlast,&
              j, iframe, icycle, nfrcycle, iatom, k, ii, jj, &
              status, keystatus, ndim, iargc, lastatom, nres, nrsolute,&
-             nrsolvent, kframe, irad, nslabs, natoms_solvent,&
+             nrsolvent, kframe, irad, nbins, natoms_solvent,&
              nsmalld, ibox, jbox, kbox,&
              noccupied, nbdim(3), nboxes(3), maxsmalld, frames
-  real :: gsssum, gsssum_random, gsslast, convert, gssscale
+  real :: dbulk
+  integer :: ibulk
+  real :: site_sum, convert
   double precision :: readsidesx, readsidesy, readsidesz, t
-  real :: side(memory,3), mass1, mass2, seed,&
-          cmx, cmy, cmz, beta, gamma, theta, random, axis(3)
+  real :: side(memory,3), mass1, mass2, seed, random, axis(3)
   real, parameter :: twopi = 2.*3.1415925655
   real, parameter :: mole = 6.022140857e23
   real :: dummyr, xdcd(memory), ydcd(memory), zdcd(memory),&
-          x1, y1, z1, time0, etime, tarray(2),&
-          gss_norm, gss_sphere, gssstep, &
-          density, dbox_x, dbox_y, dbox_z, cutoff, probeside, solute_volume,&
-          totalvolume, xmin(3), xmax(3), gssmax, kbint, kbintsphere, bulkdensity
-  real :: bulkdensity_average
+          time0, etime, tarray(2),&
+          gss_norm, gss_sphere, binstep, &
+          cutoff, solute_volume,&
+          kbint, kbintsphere
+  real :: bulkdensity_average, totalvolume, bulkvolume, bulkdensity, simdensity_average
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
                         output
   character(len=4) :: dummyc
-  logical :: readfromdcd, dcdaxis, periodic, scalelast
-  real :: shellvolume, sphericalshellvolume, shellradius, dshift, sphereradiusfromshellvolume 
+  logical :: readfromdcd, dcdaxis, periodic 
+  real :: sphericalshellvolume, shellradius, dshift, sphereradiusfromshellvolume 
 
   ! Allocatable arrays
   
-  integer, allocatable :: solute(:), solvent(:), resid(:), solute2(:), &
+  integer, allocatable :: irandom(:), solute2(:)
+  integer, allocatable :: solute(:), solvent(:), resid(:), &
                           natres(:), fatres(:), fatrsolute(:), fatrsolvent(:), &
                           nrsolv(:), ismalld(:)
-  real, allocatable :: gss(:)
-  real, allocatable :: shellvolume_average(:), gss_average(:)
+
+  real, allocatable :: gss(:), site_count(:), random_count(:)
+  real, allocatable :: shellvolume(:), shellvolume_average(:), gss_average(:), &
+                       site_count_average(:)
+
   real, allocatable :: eps(:), sig(:), q(:), e(:), s(:), mass(:),&
                        solvent_molecule(:,:), &
                        xref(:), yref(:), zref(:), xrnd(:), yrnd(:), zrnd(:),&
@@ -119,12 +125,10 @@ program g_solute_solvent
   stride = 1
   periodic = .true.
   readfromdcd = .true.
-  nslabs = 1000 
-  cutoff = 10.
-  gssmax = 20.
-  density = 1.
-  probeside = 2.
-  scalelast = .false.
+  nbins = 1000
+
+  dbulk = 10.
+  cutoff = 12.
   
   ! Open input file and read parameters
   
@@ -136,9 +140,9 @@ program g_solute_solvent
   call getarg(1,record)
   
   inputfile = record(1:length(record))
-  open(99,file=inputfile,action='read')
+  open(10,file=inputfile,action='read')
   do 
-    read(99,"( a200 )",iostat=status) record
+    read(10,"( a200 )",iostat=status) record
     if(status /= 0) exit
     if(keyword(record) == 'dcd') then
       dcdfile = value(record)
@@ -163,25 +167,17 @@ program g_solute_solvent
       line = value(record)
       read(line,*,iostat=keystatus) stride
       if(keystatus /= 0) exit 
-    else if(keyword(record) == 'nslabs') then
+    else if(keyword(record) == 'nbins') then
       line = value(record)
-      read(line,*,iostat=keystatus) nslabs
+      read(line,*,iostat=keystatus) nbins
       if(keystatus /= 0) exit 
     else if(keyword(record) == 'cutoff') then
       line = value(record)
       read(line,*,iostat=keystatus) cutoff
       if(keystatus /= 0) exit 
-    else if(keyword(record) == 'gssmax') then
+    else if(keyword(record) == 'dbulk') then
       line = value(record)
-      read(line,*,iostat=keystatus) gssmax
-      if(keystatus /= 0) exit 
-    else if(keyword(record) == 'probeside') then
-      line = value(record)
-      read(line,*,iostat=keystatus) probeside
-      if(keystatus /= 0) exit 
-    else if(keyword(record) == 'density') then
-      line = value(record)
-      read(line,*,iostat=keystatus) density
+      read(line,*,iostat=keystatus) dbulk
       if(keystatus /= 0) exit 
     else if(keyword(record) == 'periodic') then
       line = value(record)
@@ -207,10 +203,6 @@ program g_solute_solvent
       write(*,"(a,/,a)") ' ERROR: The options solute and solvent must be used ',&
                          '        with the gss.sh script, not directly. '
       stop
-    else if(keyword(record) == 'scalelast') then
-      line = value(record)
-      if ( trim(line) == 'yes' ) scalelast = .true.
-      if ( trim(line) == 'no' ) scalelast = .false.
     else if(record(1:1) /= '#' .and. & 
             keyword(record) /= 'par' .and. &
             record(1:1) > ' ') then
@@ -218,8 +210,8 @@ program g_solute_solvent
       stop
     end if
   end do               
-  close(99)
-  
+  close(10)
+
   ! If some error was found in some keyword value, report error and stop
   
   if(keystatus /= 0) then
@@ -235,15 +227,15 @@ program g_solute_solvent
             segat(natom), resat(natom), classat(natom), typeat(natom), class(natom),&
             resid(natom), natres(natom), fatres(natom), fatrsolute(natom),&
             fatrsolvent(natom), nrsolv(natom), &
-            solute2(ndim), mind(ndim) )
+            solute2(natom), mind(natom) )
 
   ! Reading parameter files to get the vdW sigmas for the definition of exclusion
   ! zones
   
   nclass = 0
-  open(99,file=inputfile,action='read',status='old')
+  open(10,file=inputfile,action='read',status='old')
   do while(.true.)
-    read(99,"( a200 )",iostat=status) record
+    read(10,"( a200 )",iostat=status) record
     if(status /= 0) exit
     if(keyword(record) == 'par') then
       file = value(record)
@@ -251,22 +243,33 @@ program g_solute_solvent
       call readpar(file,nclass,class,eps,sig)
     end if
   end do
-  close(99)
+  close(10)
   
-  ! Allocate gss array according to nslabs
+  ! Conversion factor for volumes (as KB integrals), from A^3 to cm^3/mol
 
-  if ( gssmax > cutoff ) then
-    write(*,*) ' Warning: gssmax > cutoff, the actual gssmax will be equal to cutoff. '
-    nslabs = int(cutoff/(gssmax/nslabs))
-    write(*,*) '          to keep same bin precision, nlsabs = ', nslabs 
-    gssmax = cutoff
+  convert = mole / 1.e24
+
+  ! compute ibulk from dbulk (distance from which the solvent is considered bulk,
+  ! in the estimation of bulk density)
+
+  if ( dbulk >= cutoff ) then
+    write(*,*) ' ERROR: The bulk volume is zero (dbulk >= cutoff). '
+    stop
   end if
-  
-  write(*,*) ' Number of volume slabs: ', nslabs
-  allocate( gss_average(nslabs), gss(nslabs), shellvolume_average(nslabs) )
 
-  gssstep = gssmax / float(nslabs)
-         
+  binstep = dbulk / float(nbins)
+  ibulk = nbins+1
+  nbins = int(cutoff/binstep)
+
+  write(*,*) ' Width of histogram bins: ', binstep
+  write(*,*) ' Number of bins of histograms: ', nbins
+
+  ! Allocate gss array according to nbins
+
+  allocate( gss_average(nbins), gss(nbins), site_count(nbins), site_count_average(nbins), &
+            shellvolume_average(nbins), shellvolume(nbins), &
+            random_count(nbins) )
+  
   ! Check for simple input errors
   
   if(stride < 1) then
@@ -402,7 +405,7 @@ program g_solute_solvent
   maxsmalld = nsolute*nrandom
   allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
   maxatom = max(nsolute+nrandom,natom)
-  allocate( x(maxatom), y(maxatom), z(maxatom) )
+  allocate( x(maxatom), y(maxatom), z(maxatom), irandom(nrandom) )
 
   ! Output some group properties for testing purposes
   
@@ -454,22 +457,15 @@ program g_solute_solvent
   read(10) ntotat
   
   write(*,*)
-  write(*,*) ' Number of atoms as specified in the dcd file: ',ntotat     
-  call getnframes(10,nframes,dcdaxis)
-  write(*,*) ' Total number of frames in this dcd file: ', nframes
-  if(nframes < lastframe) then
-    write(*,*) ' ERROR: lastframe greater than the number of '
-    write(*,*) '        frames of the dcd file. '
-    stop
-  end if
-  if(lastframe == 0) lastframe = nframes    
+  write(*,*) ' Number of atoms as specified in the dcd file: ', ntotat     
+  call getnframes(10,nframes,dcdaxis,lastframe)
   if(ntotat /= natom) then
     write(*,"(a,/,a)") ' ERROR: Number of atoms in the dcd file does not',&
                       &'        match the number of atoms in the psf file'
     stop
   end if
   
-  ! Number of frames (used for output only)
+  ! Number of frames (used for normalization of counts)
   
   frames=(lastframe-firstframe+1)/stride
   write(*,*) ' Number of frames to read: ', frames
@@ -487,11 +483,12 @@ program g_solute_solvent
   
   ! Reseting the gss distribution function
   
-  do i = 1, nslabs
+  do i = 1, nbins
     gss_average(i) = 0.e0
     shellvolume_average(i) = 0.e0
   end do
   bulkdensity_average = 0.e0
+  simdensity_average = 0.e0
 
   ! Initializing hasatoms array
 
@@ -590,13 +587,14 @@ program g_solute_solvent
 
       ! Summing up current data to the gss histogram
 
-      do i = 1, nslabs
-        gss(i) = 0.e0
+      do i = 1, nbins
+        site_count(i) = 0.e0
       end do
       do i = 1, nrsolvent
-        irad = int(float(nslabs)*mind(i)/gssmax)+1
-        if( irad <= nslabs ) then
-          gss(irad) = gss(irad) + 1.e0
+        irad = int(float(nbins)*mind(i)/cutoff)+1
+        if( irad <= nbins ) then
+          site_count(irad) = site_count(irad) + 1.e0
+          site_count_average(irad) = site_count_average(irad) + 1.e0
         end if
       end do
 
@@ -616,7 +614,7 @@ program g_solute_solvent
 
       ii = nsolute
       do i = 1, nrandom 
-        ii + 1
+        ii = ii + 1
         x(ii) = -axis(1)/2. + random(seed)*axis(1) 
         y(ii) = -axis(2)/2. + random(seed)*axis(2) 
         z(ii) = -axis(3)/2. + random(seed)*axis(3) 
@@ -628,11 +626,14 @@ program g_solute_solvent
       call smalldistances(nsolute,solute2,nrandom,irandom,x,y,z,cutoff,&
                           nsmalld,ismalld,dsmalld,axis,maxsmalld)
       
-      ! Estimating volume of slabs from count of random points
+      ! Estimating volume of bins from count of random points
 
+      do i = 1, nbins
+        random_count(i) = 0.e0
+      end do
       do i = 1, nsmalld
-        irad = int(float(nslabs)*dsmalld(i)/gssmax)+1
-        if ( irad <= nslabs ) then
+        irad = int(float(nbins)*dsmalld(i)/cutoff)+1
+        if ( irad <= nbins ) then
           random_count(irad) = random_count(irad) + 1.e0
         end if
       end do
@@ -640,27 +641,37 @@ program g_solute_solvent
       ! Converting counts to volume
 
       totalvolume = axis(1)*axis(2)*axis(3)
-      do i = 1, nslabs
+      do i = 1, nbins
+        ! This is a safeguard: the volume of the spherical shell is necessarily increasing,
+        ! but it might eventually be badly estimated in a particular frame if the random
+        ! distribution turned out to not have any point there. If the actuall gss count
+        ! at this distance is different from zero, the normalization is undefined.
+        !if ( site_count(i) > 0.d0 ) then
+        !  random_count(i) = max(random_count(i),1.e0)
+        !end if
         shellvolume(i) = random_count(i)*totalvolume / nrandom
         shellvolume_average(i) = shellvolume_average(i) + shellvolume(i)
       end do
 
       ! Estimating the bulk density from site count at large distances
 
-      gsssum = 0.e0
-      totalvolume = 0.e0
-      do i = ibulk, nslabs
-        gsssum = gsssum + gss(i)
-        totalvolume = totalvolume + shellvolume(i)
+      site_sum = 0.e0
+      bulkvolume = 0.e0
+      do i = ibulk, nbins
+        site_sum = site_sum + site_count(i)
+        bulkvolume = bulkvolume + shellvolume(i)
       end do
-      bulkdensity = gsssum / totalvolume
+      bulkdensity = site_sum / bulkvolume
       bulkdensity_average = bulkdensity_average + bulkdensity
+      simdensity_average = simdensity_average + nrsolvent/totalvolume
 
       ! Normalizing the gss distribution at this frame
       
-      do i = 1, nlsabs
-        gss(i) = gss(i) / ( bulkdensity*shellvolume(i) )
-        gss_average(i) = gss_average(i) + gss(i)
+      do i = 1, nbins
+        if ( shellvolume(i) > 0.d0 ) then
+          gss(i) = site_count(i) / ( bulkdensity*shellvolume(i) )
+          gss_average(i) = gss_average(i) + gss(i)
+        end if
       end do
 
       ! Print progress
@@ -677,11 +688,25 @@ program g_solute_solvent
   ! Averaging results on the number of frames
 
   bulkdensity_average = bulkdensity_average / frames
-  do i = 1, nslabs
+  simdensity_average = simdensity_average / frames
+  do i = 1, nbins
     gss_average(i) = gss_average(i) / frames
     shellvolume_average(i) = shellvolume_average(i) / frames
+    site_count_average(i) = site_count_average(i) / frames
   end do
 
+  write(*,"(a,f12.5)") '  Solvent density in simulation box (sites/A^3): ', simdensity_average
+  write(*,"(a,f12.5)") '  Estimated bulk density (sites/A^3): ', bulkdensity_average
+  write(*,"(a,f12.5)") '  Solute partial volume (sites/A^3): ', bulkdensity_average-simdensity_average
+
+open(20,file=output(1:length(output)))
+do i = 1, nbins
+  write(20,*) shellradius(i,binstep), gss_average(i), shellvolume_average(i), site_count_average(i)
+end do
+close(20)
+
+
+stop
   ! Open output file and writes all information of this run
 
   !
@@ -720,22 +745,20 @@ program g_solute_solvent
 
   ! Compute error of gssrand distribution at large distance (expected to be 1.00)
 
-  if ( gss(nslabs) < 1.e-10 ) then
+  if ( gss(nbins) < 1.e-10 ) then
     write(*,*) ' ERROR: Something wrong with random normalization. Contact the developer. '
     stop
   end if
-  gsslast = gss_random(nslabs)/gss(nslabs)
-  write(20,"('# Error in random normalization at largest distance: ',f12.3,'%' )") (gsslast - 1.d0)*100
+  !write(20,"('# Error in random normalization at largest distance: ',f12.3,'%' )") (gsslast - 1.d0)*100
 
-  gssscale = gss(nslabs)/shellvolume(gss_random(nslabs),bulkdensity)
-  write(20,"('# Solvent density at largest distance slab (sites/A^3): ',f12.5 )") gssscale
-  gssscale = gssscale / bulkdensity
-  write(20,"('# Difference relative to estimated bulk density: ',f12.3,'%' )") (gssscale - 1.d0)*100
-  write(20,"('#')")
-  if ( scalelast ) then
-    write(20,"('# scalelast is true, so GSS/GSSRND (column 2) is divided by: ',f12.3 )") gssscale
-  end if
-  write(20,"('#')")
+  !write(20,"('# Solvent density at largest distance slab (sites/A^3): ',f12.5 )") gssscale
+  !gssscale = gssscale / bulkdensity
+  !write(20,"('# Difference relative to estimated bulk density: ',f12.3,'%' )") (gssscale - 1.d0)*100
+  !write(20,"('#')")
+  !if ( scalelast ) then
+  !  write(20,"('# scalelast is true, so GSS/GSSRND (column 2) is divided by: ',f12.3 )") gssscale
+  !end if
+  !write(20,"('#')")
 
   ! Output table
 
@@ -754,32 +777,19 @@ program g_solute_solvent
   &'#',t5,'1-DISTANCE',t24,'2-GSS',t32,'3-GSS/SPHER',t50,'4-COUNT',t64,'5-CUMUL',&
   &t74,'6-COUNT RND',t88,'7-CUMUL RND',t105,'8-KB RND',t119,'9-KB SPH',t131,'10-D SHIFT' )" )
 
-  ! Conversion factor for KB integrals, from A^3 to cm^3/mol
-
-  convert = mole / 1.e24
-
-  gsssum = 0
-  gsssum_random = 0
+  site_sum = 0
   kbint = 0.e0
   kbintsphere = 0.e0
-  do i = 1, nslabs
-    if ( gss_random(i) == 0 ) cycle
-    gsssum = gsssum + gss(i)
-    gsssum_random = gsssum_random + gss_random(i)
+  do i = 1, nbins
+    site_sum = site_sum + gss(i)
     ! Normalization by spherical shell of this radius
-    gss_sphere = gss(i) / ( bulkdensity*sphericalshellvolume(i,gssstep) ) 
+!    gss_sphere = gss(i) / ( bulkdensity*sphericalshellvolume(i,binstep) ) 
     ! Normalization by random distribution of molecules
-    if ( gss_random(i) > 0. ) then
-      gss_norm = gss(i) / gss_random(i)
-    else
-      gss_norm = 0.
-    end if
-    dshift = sphereradiusfromshellvolume(gss_random(i)/bulkdensity,gssstep)
-    if ( scalelast ) gss_norm = gss_norm / gssscale
-    kbint = kbint + convert*(gss_norm - 1.e0)*shellvolume(gss_random(i),bulkdensity)
-    kbintsphere = kbintsphere + convert*(gss_norm - 1.e0)*sphericalshellvolume(i,gssstep)
+!    if ( scalelast ) gss_norm = gss_norm / gssscale
+!    kbint = kbint + convert*(gss_norm - 1.e0)*shellvolume(gss_random(i),bulkdensity)
+!    kbintsphere = kbintsphere + convert*(gss_norm - 1.e0)*sphericalshellvolume(i,binstep)
     write(20,"( 10(tr2,f12.7) )")&
-    shellradius(i,gssstep), gss_norm, gss_sphere, gss(i), gsssum, gss_random(i), gsssum_random,&
+    shellradius(i,binstep), gss_norm, gss_sphere, gss(i), site_sum, &
                             kbint, kbintsphere, dshift
   end do
   close(20)
@@ -806,18 +816,6 @@ program g_solute_solvent
   write(*,*)        
 
 end program g_solute_solvent
-
-! Computes the volume of the shell given the random distribution
-! count and the average bulk density
-
-real function shellvolume(gss_random,bulkdensity)
-
-  implicit none
-  real :: gss_random, bulkdensity
-
-  shellvolume = gss_random / bulkdensity
-
-end function shellvolume
 
 ! Computes the volume of the spherical shell 
 ! defined within [(i-1)*step,i*step]
