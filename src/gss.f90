@@ -226,7 +226,7 @@ program g_solute_solvent
             segat(natom), resat(natom), classat(natom), typeat(natom), class(natom),&
             resid(natom), natres(natom), fatres(natom), fatrsolute(natom),&
             fatrsolvent(natom), nrsolv(natom), &
-            solute2(natom), mind(natom) )
+            solute2(natom) )
 
   ! Reading parameter files to get the vdW sigmas for the definition of exclusion
   ! zones
@@ -400,7 +400,7 @@ program g_solute_solvent
 
   nrandom = 5*nrsolvent
   maxsmalld = nsolute*nrandom
-  allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
+  allocate( ismalld(maxsmalld), dsmalld(maxsmalld), mind(maxsmalld) )
   maxatom = max(nsolute+nrandom,natom)
   allocate( x(maxatom), y(maxatom), z(maxatom), irandom(nrandom) )
 
@@ -612,14 +612,24 @@ program g_solute_solvent
       
       call smalldistances(nsolute,solute2,nrandom,irandom,x,y,z,cutoff,&
                           nsmalld,ismalld,dsmalld,axis,maxsmalld)
+
+!voltar: corrigir contagem de minimas distancias dos átomos fantasmas
+      do i = 1, nrandom
+        mind(i) = cutoff + 1.e0
+      end do
+      do i = 1, nsmalld
+        if ( dsmalld(i) < mind(ismalld(i)) ) then
+          mind(i) = dsmalld(i)
+        end if
+      end do 
       
       ! Estimating volume of bins from count of random points 
 
       do i = 1, nbins
         random_count(i) = 0.e0
       end do
-      do i = 1, nsmalld
-        irad = int(float(nbins)*dsmalld(i)/cutoff)+1
+      do i = 1, nrandom
+        irad = int(float(nbins)*mind(i)/cutoff)+1
         if ( irad <= nbins ) then
           random_count(irad) = random_count(irad) + 1.e0
         end if
