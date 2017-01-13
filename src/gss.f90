@@ -56,11 +56,11 @@ program g_solute_solvent
   integer :: natom, nsolute, nsolvent, isolute, isolvent, &
              narg, length, firstframe, lastframe, stride, nclass,&
              nframes, dummyi, i, ntotat, memframes, ncycles, memlast,&
-             j, iframe, icycle, nfrcycle, iatom, k, ii, jj, &
-             status, keystatus, ndim, iargc, lastatom, nres, nrsolute,&
+             j, iframe, icycle, nfrcycle, iatom, k, ii, &
+             status, keystatus, iargc, lastatom, nres, nrsolute,&
              nrsolvent, kframe, irad, nbins, natoms_solvent,&
-             nsmalld, ibox, jbox, kbox,&
-             noccupied, nbdim(3), nboxes(3), maxsmalld, frames
+             nsmalld, & 
+             maxsmalld, frames
   real :: dbulk
   integer :: ibulk
   real :: site_sum, convert
@@ -70,16 +70,17 @@ program g_solute_solvent
   real, parameter :: mole = 6.022140857e23
   real :: dummyr, xdcd(memory), ydcd(memory), zdcd(memory),&
           time0, etime, tarray(2),&
-          gss_norm, gss_sphere, binstep, &
-          cutoff, solute_volume,&
-          kbint, kbintsphere
-  real :: bulkdensity_average, totalvolume, bulkvolume, bulkdensity, simdensity_average
+          binstep, &
+          cutoff,  kbint, kbintsphere
+  real :: bulkdensity, totalvolume, bulkvolume, simdensity, solutevolume
+  real :: bulkerror, sdbulkerror
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
                         output
   character(len=4) :: dummyc
   logical :: readfromdcd, dcdaxis, periodic 
-  real :: sphericalshellvolume, shellradius, dshift, sphereradiusfromshellvolume 
+  real :: shellradius, rshift
+  real :: sphericalshellvolume, sphereradiusfromshellvolume
 
   ! Allocatable arrays
   
@@ -88,9 +89,8 @@ program g_solute_solvent
                           natres(:), fatres(:), fatrsolute(:), fatrsolvent(:), &
                           nrsolv(:), ismalld(:)
 
-  real, allocatable :: gss(:), site_count(:), random_count(:)
-  real, allocatable :: shellvolume(:), shellvolume_average(:), gss_average(:), &
-                       site_count_average(:)
+  real, allocatable :: site_count(:), random_count(:), shellvolume(:)
+  real, allocatable :: gss(:)
 
   real, allocatable :: eps(:), sig(:), q(:), e(:), s(:), mass(:),&
                        solvent_molecule(:,:), &
@@ -98,7 +98,6 @@ program g_solute_solvent
                        x(:), y(:), z(:), mind(:), dsmalld(:)
   character(len=6), allocatable :: class(:), segat(:), resat(:),&
                                    typeat(:), classat(:)
-  logical, allocatable :: hasatoms(:,:,:)
   
   ! Compute time
   
@@ -266,9 +265,7 @@ program g_solute_solvent
 
   ! Allocate gss array according to nbins
 
-  allocate( gss_average(nbins), gss(nbins), site_count(nbins), site_count_average(nbins), &
-            shellvolume_average(nbins), shellvolume(nbins), &
-            random_count(nbins) )
+  allocate( gss(nbins), site_count(nbins), shellvolume(nbins), random_count(nbins) )
   
   ! Check for simple input errors
   
@@ -401,7 +398,7 @@ program g_solute_solvent
 
   ! This is for the initialization of the smalldistances routine
 
-  nrandom = 2*nrsolvent
+  nrandom = 5*nrsolvent
   maxsmalld = nsolute*nrandom
   allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
   maxatom = max(nsolute+nrandom,natom)
@@ -481,21 +478,15 @@ program g_solute_solvent
   write(*,*) ' Last cycle will read ', memlast,' frames. '
   write(*,*)        
   
-  ! Reseting the gss distribution function
+  ! Reseting the counters
   
   do i = 1, nbins
-    gss_average(i) = 0.e0
-    shellvolume_average(i) = 0.e0
+    site_count(i) = 0.e0
+    random_count(i) = 0.e0
+    shellvolume(i) = 0.e0
   end do
-  bulkdensity_average = 0.e0
-  simdensity_average = 0.e0
-
-  ! Initializing hasatoms array
-
-  nbdim(1) = 1
-  nbdim(2) = 1
-  nbdim(3) = 1
-  allocate( hasatoms(0:nbdim(1)+1,0:nbdim(2)+1,0:nbdim(3)+1))
+  bulkdensity = 0.e0
+  simdensity = 0.e0
 
   ! Reading dcd file and computing the gss function
    
@@ -587,14 +578,10 @@ program g_solute_solvent
 
       ! Summing up current data to the gss histogram
 
-      do i = 1, nbins
-        site_count(i) = 0.e0
-      end do
       do i = 1, nrsolvent
         irad = int(float(nbins)*mind(i)/cutoff)+1
         if( irad <= nbins ) then
           site_count(irad) = site_count(irad) + 1.e0
-          site_count_average(irad) = site_count_average(irad) + 1.e0
         end if
       end do
 
@@ -626,7 +613,7 @@ program g_solute_solvent
       call smalldistances(nsolute,solute2,nrandom,irandom,x,y,z,cutoff,&
                           nsmalld,ismalld,dsmalld,axis,maxsmalld)
       
-      ! Estimating volume of bins from count of random points
+      ! Estimating volume of bins from count of random points 
 
       do i = 1, nbins
         random_count(i) = 0.e0
@@ -642,15 +629,7 @@ program g_solute_solvent
 
       totalvolume = axis(1)*axis(2)*axis(3)
       do i = 1, nbins
-        ! This is a safeguard: the volume of the spherical shell is necessarily increasing,
-        ! but it might eventually be badly estimated in a particular frame if the random
-        ! distribution turned out to not have any point there. If the actuall gss count
-        ! at this distance is different from zero, the normalization is undefined.
-        !if ( site_count(i) > 0.d0 ) then
-        !  random_count(i) = max(random_count(i),1.e0)
-        !end if
-        shellvolume(i) = random_count(i)*totalvolume / nrandom
-        shellvolume_average(i) = shellvolume_average(i) + shellvolume(i)
+        shellvolume(i) = shellvolume(i) + random_count(i)*totalvolume / nrandom
       end do
 
       ! Estimating the bulk density from site count at large distances
@@ -661,23 +640,12 @@ program g_solute_solvent
         site_sum = site_sum + site_count(i)
         bulkvolume = bulkvolume + shellvolume(i)
       end do
-      bulkdensity = site_sum / bulkvolume
-      bulkdensity_average = bulkdensity_average + bulkdensity
-      simdensity_average = simdensity_average + nrsolvent/totalvolume
+      bulkdensity = bulkdensity + site_sum/bulkvolume
+      simdensity = simdensity + nrsolvent/totalvolume
 
-      ! Normalizing the gss distribution at this frame
-      
-      do i = 1, nbins
-        if ( shellvolume(i) > 0.d0 ) then
-          gss(i) = site_count(i) / ( bulkdensity*shellvolume(i) )
-          gss_average(i) = gss_average(i) + gss(i)
-        end if
-      end do
+      ! Write progress
 
-      ! Print progress
-
-      write(*,"( 7a,f6.2,'%' )",advance='no')&
-           (char(8),i=1,7), 100.*float(kframe)/nfrcycle
+      write(*,"( 7a,f6.2,'%' )",advance='no') (char(8),i=1,7), 100.*float(kframe)/nfrcycle
   
       iatom = iatom + ntotat
     end do
@@ -687,26 +655,29 @@ program g_solute_solvent
 
   ! Averaging results on the number of frames
 
-  bulkdensity_average = bulkdensity_average / frames
-  simdensity_average = simdensity_average / frames
+  bulkdensity = bulkdensity / frames
+  simdensity = simdensity / frames
   do i = 1, nbins
-    gss_average(i) = gss_average(i) / frames
-    shellvolume_average(i) = shellvolume_average(i) / frames
-    site_count_average(i) = site_count_average(i) / frames
+    shellvolume(i) = shellvolume(i) / frames
+    site_count(i) = site_count(i) / frames
+    if ( shellvolume(i) > 0.e0 ) then
+      gss(i) = site_count(i) / ( bulkdensity*shellvolume(i) )
+    else
+      gss(i) = 0.e0
+    end if
   end do
 
-  write(*,"(a,f12.5)") '  Solvent density in simulation box (sites/A^3): ', simdensity_average
-  write(*,"(a,f12.5)") '  Estimated bulk density (sites/A^3): ', bulkdensity_average
-  write(*,"(a,f12.5)") '  Solute partial volume (sites/A^3): ', bulkdensity_average-simdensity_average
+  write(*,*)
+  write(*,"(a,f12.5)") '  Solvent density in simulation box (sites/A^3): ', simdensity
+  write(*,"(a,f12.5)") '  Estimated bulk solvent density (sites/A^3): ', bulkdensity
+  write(*,*)
+  write(*,"(a,f12.5)") '  Molar volume of solvent simulation box (cc/mol): ', convert/simdensity
+  write(*,"(a,f12.5)") '  Molar volume of solvent in bulk (cc/mol): ', convert/bulkdensity
 
-open(20,file=output(1:length(output)))
-do i = 1, nbins
-  write(20,*) shellradius(i,binstep), gss_average(i), shellvolume_average(i), site_count_average(i)
-end do
-close(20)
+  solutevolume = convert*nrsolvent*(1.e0/simdensity-1e0/bulkdensity)
+  write(*,*)
+  write(*,"(a,f12.5)") '  Solute partial volume (cc/mol): ', solutevolume
 
-
-stop
   ! Open output file and writes all information of this run
 
   !
@@ -725,8 +696,12 @@ stop
              &'# Periodic boundary conditions: ',/,&
              &'# Periodic: ',l1,' Read from DCD: ',l1,/,&
              &'#',/,&
-             &'# Average solute volume estimate (A^3): ',f12.5,/,&
-             &'# Bulk solvent density estimated (sites/A^3): ',f12.5,/,&
+             &'# Density of solvent in simulation box (sites/A^3): ',f12.5,/,&
+             &'# Density of solvent in bulk (estimated) (sites/A^3): ',f12.5,/,&
+             &'# Molar volume of solvent in simulation (cc/mol): ',f12.5,/,&
+             &'# Molar volume of solvent in bulk (estimated) (cc/mol): ',f12.5,/,&
+             &'#',/,&
+             &'# Solute partial volume estimate (cc/mol): ',f12.5,/,&
              &'#',/,&
              &'# Number of atoms and mass of group 1: ',i6,f12.3,/,&
              &'# First and last atoms of group 1: ',i6,tr1,i6,/,&
@@ -739,26 +714,23 @@ stop
              &psffile(1:length(psffile)),&
              &firstframe, lastframe, stride,&
              &periodic, readfromdcd, &
-             &solute_volume, bulkdensity, &
+             &simdensity, bulkdensity, convert/simdensity, convert/bulkdensity, solutevolume, &
              &nsolute, mass1, solute(1), solute(nsolute),& 
              &nsolvent, mass2, solvent(1), solvent(nsolvent)  
 
-  ! Compute error of gssrand distribution at large distance (expected to be 1.00)
-
-  if ( gss(nbins) < 1.e-10 ) then
-    write(*,*) ' ERROR: Something wrong with random normalization. Contact the developer. '
-    stop
-  end if
-  !write(20,"('# Error in random normalization at largest distance: ',f12.3,'%' )") (gsslast - 1.d0)*100
-
-  !write(20,"('# Solvent density at largest distance slab (sites/A^3): ',f12.5 )") gssscale
-  !gssscale = gssscale / bulkdensity
-  !write(20,"('# Difference relative to estimated bulk density: ',f12.3,'%' )") (gssscale - 1.d0)*100
-  !write(20,"('#')")
-  !if ( scalelast ) then
-  !  write(20,"('# scalelast is true, so GSS/GSSRND (column 2) is divided by: ',f12.3 )") gssscale
-  !end if
-  !write(20,"('#')")
+  bulkerror = 0.e0
+  do i = ibulk, nbins
+    bulkerror = bulkerror + gss(i)
+  end do
+  bulkerror = bulkerror / ( nbins-ibulk+1 )
+  do i = ibulk, nbins
+    sdbulkerror = (bulkerror - gss(i))**2
+  end do
+  sdbulkerror = sqrt(sdbulkerror/(nbins-ibulk+1))
+  write(*,*)
+  write(*,"('  Average and standard deviation of bulk-gss: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
+  write(29,"('#')")
+  write(20,"('# Average and standard deviation of bulk-gss: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
 
   ! Output table
 
@@ -774,23 +746,33 @@ stop
   &'#       9  Kirwood-Buff integral (cc/mol) computed from column 2 with spherical shell volume (int 4*pi*r^2*(gss-1) dr ',/,&
   &'#      10  Spherical shifted minimum distance ')")
   write(20,"( '#',/,&      
-  &'#',t5,'1-DISTANCE',t24,'2-GSS',t32,'3-GSS/SPHER',t50,'4-COUNT',t64,'5-CUMUL',&
-  &t74,'6-COUNT RND',t88,'7-CUMUL RND',t105,'8-KB RND',t119,'9-KB SPH',t131,'10-D SHIFT' )" )
+  &'#',t5,'1-DISTANCE',t24,'2-GSS',t31,'3-SITE COUNT',t46,'4-SHELL VOL',t59,'5-SPHERE VOL',&
+  &t73,'6-GSS/SPHERE',t91,'7-KB INT',t102,'8-KB SPHERE',t119,'9-RSHIFT' )" )
 
-  site_sum = 0
   kbint = 0.e0
   kbintsphere = 0.e0
   do i = 1, nbins
-    site_sum = site_sum + gss(i)
-    ! Normalization by spherical shell of this radius
-!    gss_sphere = gss(i) / ( bulkdensity*sphericalshellvolume(i,binstep) ) 
-    ! Normalization by random distribution of molecules
-!    if ( scalelast ) gss_norm = gss_norm / gssscale
-!    kbint = kbint + convert*(gss_norm - 1.e0)*shellvolume(gss_random(i),bulkdensity)
-!    kbintsphere = kbintsphere + convert*(gss_norm - 1.e0)*sphericalshellvolume(i,binstep)
-    write(20,"( 10(tr2,f12.7) )")&
-    shellradius(i,binstep), gss_norm, gss_sphere, gss(i), site_sum, &
-                            kbint, kbintsphere, dshift
+
+    ! KB integral using shell volumes computed
+    kbint = kbint + convert*(gss(i)-1.e0)*shellvolume(i)
+
+    ! KB integral using spherical shell volume 
+    kbintsphere = kbintsphere + convert*(gss(i)-1.e0)*sphericalshellvolume(i,binstep)
+
+    ! Distance transformation
+    rshift = sphereradiusfromshellvolume(shellvolume(i),binstep)
+
+    write(20,"( 9(tr2,f12.7) )") &
+    shellradius(i,binstep),&                                      ! 1-DISTANCE
+    gss(i),&                                                      ! 2-GSS
+    site_count(i),&                                               ! 3-SITE COUNT
+    shellvolume(i),&                                              ! 4-SHELL VOL
+    sphericalshellvolume(i,binstep),&                             ! 5-SPHER VOL
+    site_count(i)/(bulkdensity*sphericalshellvolume(i,binstep)),& ! 6-GSS/SPHER
+    kbint,&                                                       ! 7-KB INT
+    kbintsphere,&                                                 ! 8-KB SPHER
+    rshift                                                        ! 9-RSHIFT
+
   end do
   close(20)
 
@@ -849,13 +831,17 @@ end function shellradius
 ! Computes the radius that corresponds to a spherical shell of
 ! a given volume
 
-real function  sphereradiusfromshellvolume(volume,step)
+real function sphereradiusfromshellvolume(volume,step)
  
   implicit none
   real :: volume, step, rmin
   real, parameter :: pi = 3.1415925655
   real, parameter :: fourthirdsofpi = (4./3.)*3.1415925655
   
+  if ( 3*step*volume - pi*step**4 <= 0.d0 ) then
+    sphereradiusfromshellvolume = 0.d0
+    return
+  end if
   rmin = (sqrt(3*pi)*sqrt(3*step*volume-pi*step**4)-3*pi*step**2)/(6*pi*step)
   sphereradiusfromshellvolume = ( 0.5e0*( volume/fourthirdsofpi + 2*rmin**3 ) )**(1.e0/3.e0)
 
