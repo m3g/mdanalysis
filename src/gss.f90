@@ -62,7 +62,7 @@ program g_solute_solvent
              nsmalld, & 
              maxsmalld, frames
   real :: dbulk
-  integer :: ibulk
+  integer :: ibulk, nint
   real :: site_sum, convert
   double precision :: readsidesx, readsidesy, readsidesz, t
   real :: side(memory,3), mass1, mass2, seed, random, axis(3)
@@ -125,6 +125,7 @@ program g_solute_solvent
   periodic = .true.
   readfromdcd = .true.
   nbins = 1000
+  nint = 5
 
   dbulk = 10.
   cutoff = 12.
@@ -169,6 +170,10 @@ program g_solute_solvent
     else if(keyword(record) == 'nbins') then
       line = value(record)
       read(line,*,iostat=keystatus) nbins
+      if(keystatus /= 0) exit 
+    else if(keyword(record) == 'nint') then
+      line = value(record)
+      read(line,*,iostat=keystatus) nint
       if(keystatus /= 0) exit 
     else if(keyword(record) == 'cutoff') then
       line = value(record)
@@ -288,6 +293,8 @@ program g_solute_solvent
   end if
   write(*,*) ' Stride (will jump frames): ', stride
   write(*,*) ' Cutoff for linked cells: ', cutoff
+  write(*,*) ' Bulk distance: ', dbulk
+  write(*,*) ' Multiplying factor for random count: ', nint
   
   ! Read PSF file
   
@@ -398,7 +405,7 @@ program g_solute_solvent
 
   ! This is for the initialization of the smalldistances routine
 
-  nrandom = 2*nrsolvent
+  nrandom = nint*nrsolvent
   maxsmalld = nsolute*nrandom
   allocate( ismalld(maxsmalld), dsmalld(maxsmalld), mind(maxsmalld) )
   maxatom = max(nsolute+nrandom,natom)
