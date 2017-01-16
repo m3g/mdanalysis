@@ -126,9 +126,8 @@ program g_solute_solvent
   readfromdcd = .true.
   nbins = 1000
   nint = 5
-
-  dbulk = 10.
-  cutoff = 12.
+  dbulk = 12.
+  cutoff = 14.
   
   ! Open input file and read parameters
   
