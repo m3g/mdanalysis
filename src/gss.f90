@@ -61,8 +61,9 @@ program g_solute_solvent
              nrsolvent, kframe, irad, nbins, natoms_solvent,&
              nsmalld, & 
              maxsmalld, frames
+  integer :: nrsolvent_random
   real :: dbulk
-  integer :: ibulk, nint
+  integer :: ibulk, nintegral
   real :: site_sum, convert
   double precision :: readsidesx, readsidesy, readsidesz, t
   real :: side(memory,3), mass1, mass2, seed, random, axis(3)
@@ -82,14 +83,17 @@ program g_solute_solvent
   real :: shellradius, rshift
   real :: sphericalshellvolume, sphereradiusfromshellvolume
 
+  integer :: jj
+  real :: beta, gamma, theta, cmx, cmy, cmz
+
   ! Allocatable arrays
   
-  integer, allocatable :: irandom(:), solute2(:)
+  integer, allocatable :: irandom(:), solute2(:), solvent_random(:)
   integer, allocatable :: solute(:), solvent(:), resid(:), &
                           natres(:), fatres(:), fatrsolute(:), fatrsolvent(:), &
-                          irsolv(:), ismalld(:)
+                          irsolv(:), ismalld(:), irsolv_random(:)
 
-  real, allocatable :: site_count(:), random_count(:), shellvolume(:)
+  real, allocatable :: site_count(:), site_count_random(:), random_count(:), shellvolume(:)
   real, allocatable :: gss(:)
 
   real, allocatable :: eps(:), sig(:), q(:), e(:), s(:), mass(:),&
@@ -125,7 +129,7 @@ program g_solute_solvent
   periodic = .true.
   readfromdcd = .true.
   nbins = 1000
-  nint = 5
+  nintegral = 5
   dbulk = 12.
   cutoff = 14.
   binstep = 0.1e0
@@ -177,7 +181,7 @@ program g_solute_solvent
       if(keystatus /= 0) exit 
     else if(keyword(record) == 'nint') then
       line = value(record)
-      read(line,*,iostat=keystatus) nint
+      read(line,*,iostat=keystatus) nintegral
       if(keystatus /= 0) exit 
     else if(keyword(record) == 'cutoff') then
       line = value(record)
@@ -234,8 +238,14 @@ program g_solute_solvent
   allocate( eps(natom), sig(natom), q(natom), e(natom), s(natom), mass(natom),&
             segat(natom), resat(natom), classat(natom), typeat(natom), class(natom),&
             resid(natom), natres(natom), fatres(natom), fatrsolute(natom),&
-            fatrsolvent(natom), irsolv(natom), &
-            solute2(natom) )
+            fatrsolvent(natom), irsolv(natom), solute2(natom) )
+
+  ! These will contain indexes for the atoms of the randomly generated solvent molecules,
+  ! which are more than the number of the atoms of the solvent in the actual
+  ! simulation. Therefore, 2*natom is an overstimated guess. If this turns out not
+  ! to be sufficient, it will be fixed afterwards.
+
+  allocate( solvent_random(2*natom), irsolv_random(2*natom) )
 
   ! Reading parameter files to get the vdW sigmas for the definition of exclusion
   ! zones
@@ -281,7 +291,7 @@ program g_solute_solvent
 
   ! Allocate gss array according to nbins
 
-  allocate( gss(nbins), site_count(nbins), shellvolume(nbins), random_count(nbins) )
+  allocate( gss(nbins), site_count(nbins), site_count_random(nbins), shellvolume(nbins), random_count(nbins) )
   
   ! Check for simple input errors
   
@@ -305,7 +315,7 @@ program g_solute_solvent
   write(*,*) ' Stride (will jump frames): ', stride
   write(*,*) ' Cutoff for linked cells: ', cutoff
   write(*,*) ' Bulk distance: ', dbulk
-  write(*,*) ' Multiplying factor for random count: ', nint
+  write(*,*) ' Multiplying factor for random count: ', nintegral
   
   ! Read PSF file
   
@@ -416,10 +426,10 @@ program g_solute_solvent
 
   ! This is for the initialization of the smalldistances routine
 
-  nrandom = nint*nrsolvent
+  nrandom = nintegral*nrsolvent
   maxsmalld = nsolute*nrandom
   allocate( ismalld(maxsmalld), dsmalld(maxsmalld), mind(maxsmalld) )
-  maxatom = max(nsolute+nrandom,natom)
+  maxatom = 2*natom
   allocate( x(maxatom), y(maxatom), z(maxatom), irandom(nrandom) )
 
   ! Output some group properties for testing purposes
@@ -501,6 +511,7 @@ program g_solute_solvent
   do i = 1, nbins
     site_count(i) = 0.e0
     random_count(i) = 0.e0
+    site_count_random(i) = 0.e0
     shellvolume(i) = 0.e0
   end do
   bulkdensity = 0.e0
@@ -604,7 +615,7 @@ program g_solute_solvent
       end do
 
       !
-      ! Computing volumes for normalization
+      ! Computing volumes
       !
 
       ! Solute coordinates are put at the first nsolute positions of x,y,z
@@ -672,6 +683,110 @@ program g_solute_solvent
       bulkdensity = bulkdensity + site_sum/bulkvolume
       simdensity = simdensity + nrsolvent/totalvolume
 
+      !
+      ! Bulk density estimated, now we generate a random distribution of solvent
+      ! molecules with the appropriate density, to compute the gss in the absence
+      ! of solute-solvent interactions: site_sum/bulkvolume is the bulkdensity at
+      ! this frame, as computed above
+      !
+
+      nrsolvent_random = nint(totalvolume*(site_sum/bulkvolume))
+
+      if ( nrsolvent_random > size( solvent_random ) ) then
+        deallocate( solvent_random, irsolv_random ) 
+        allocate( solvent_random(nrsolvent_random), irsolv_random(nrsolvent_random) )
+      end if
+
+      do isolvent = 1, nrsolvent_random
+
+        ! First, pick randomly a solvent molecule from the box, to minimize conformational
+        ! biases of the solvent molecules
+    
+        ii = (nrsolvent-1)*int(random(seed)) + 1
+
+        ! Save the coordinates of this molecule in this frame in the solvent_molecule array
+    
+        jj = iatom + solvent(1) + natoms_solvent*(ii-1)
+        do i = 1, natoms_solvent
+          solvent_molecule(i,1) = xdcd(jj+i-1)
+          solvent_molecule(i,2) = ydcd(jj+i-1)
+          solvent_molecule(i,3) = zdcd(jj+i-1)
+        end do
+
+        ! Put molecule in its center of coordinates for it to be the reference coordinate for the 
+        ! random coordinates that will be generated
+  
+        cmx = 0.
+        cmy = 0.
+        cmz = 0.
+        do i = 1, natoms_solvent
+          cmx = cmx + solvent_molecule(i,1)
+          cmy = cmy + solvent_molecule(i,2)
+          cmz = cmz + solvent_molecule(i,3)
+        end do
+        cmx = cmx / float(natoms_solvent)
+        cmy = cmy / float(natoms_solvent)
+        cmz = cmz / float(natoms_solvent)
+        do i = 1, natoms_solvent
+          xref(i) = solvent_molecule(i,1) - cmx
+          yref(i) = solvent_molecule(i,2) - cmy
+          zref(i) = solvent_molecule(i,3) - cmz
+        end do
+
+        ! Generate a random position for this molecule
+  
+        cmx = -axis(1)/2. + random(seed)*axis(1) 
+        cmy = -axis(2)/2. + random(seed)*axis(2) 
+        cmz = -axis(3)/2. + random(seed)*axis(3) 
+        beta = random(seed)*twopi
+        gamma = random(seed)*twopi
+        theta = random(seed)*twopi
+        call compcart(natoms_solvent,xref,yref,zref,xrnd,yrnd,zrnd,&
+                      cmx,cmy,cmz,beta,gamma,theta)
+
+        ! Add this molecule to x, y, z arrays
+
+        do i = 1, natoms_solvent
+          ii = nsolute + (isolvent-1)*natoms_solvent + i
+          x(ii) = xrnd(i)
+          y(ii) = yrnd(i)
+          z(ii) = zrnd(i)
+          solvent_random(ii-nsolute) = ii
+          ! Annotate to which molecule this atom pertains
+          irsolv_random(ii-nsolute) = isolvent
+        end do
+
+      end do
+
+      ! The solute atom was already added to the xyz array for computing volumes, so now
+      ! we have only to compute the distances
+
+      call smalldistances(nsolute,solute2,nrsolvent_random,solvent_random,x,y,z,cutoff,&
+                          nsmalld,ismalld,dsmalld,axis,maxsmalld)
+
+      !
+      ! Computing the gss functions from distance data
+      !
+
+      do i = 1, nrsolvent_random
+        mind(i) = cutoff + 1.e0
+      end do
+      do i = 1, nsmalld
+        isolvent = irsolv_random(ismalld(i))
+        if ( dsmalld(i) < mind(isolvent) ) then
+          mind(isolvent) = dsmalld(i)
+        end if
+      end do
+
+      ! Summing up current data to the gss histogram
+
+      do i = 1, nrsolvent_random
+        irad = int(float(nbins)*mind(i)/cutoff)+1
+        if ( irad <= nbins ) then
+          site_count_random(irad) = site_count_random(irad) + 1.e0
+        end if
+      end do
+
       ! Write progress
 
       write(*,"( 7a,f6.2,'%' )",advance='no') (char(8),i=1,7), 100.*float(kframe)/nfrcycle
@@ -689,8 +804,9 @@ program g_solute_solvent
   do i = 1, nbins
     shellvolume(i) = shellvolume(i) / frames
     site_count(i) = site_count(i) / frames
-    if ( shellvolume(i) > 0.e0 ) then
-      gss(i) = site_count(i) / ( bulkdensity*shellvolume(i) )
+    site_count_random(i) = site_count_random(i) / frames
+    if ( site_count_random(i) > 0.e0 ) then
+      gss(i) = site_count(i) / site_count_random(i)
     else
       gss(i) = 0.e0
     end if
@@ -774,9 +890,9 @@ program g_solute_solvent
   &'#       8  Kirwood-Buff integral (cc/mol) computed from column 2 with volume estimated from col 6 (int V(r)*(gss-1) dr ',/,&
   &'#       9  Kirwood-Buff integral (cc/mol) computed from column 2 with spherical shell volume (int 4*pi*r^2*(gss-1) dr ',/,&
   &'#      10  Spherical shifted minimum distance ')")
-  write(20,"( '#',/,&      
-  &'#',t5,'1-DISTANCE',t24,'2-GSS',t31,'3-SITE COUNT',t46,'4-SHELL VOL',t59,'5-SPHERE VOL',&
-  &t73,'6-GSS/SPHERE',t91,'7-KB INT',t102,'8-KB SPHERE',t119,'9-RSHIFT' )" )
+  write(20,"('#')")
+  write(20,"('#   1-DISTANCE         2-GSS  3-COUNT RAND  3-SITE COUNT   4-SHELL VOL  5-SPHERE VOL  6-GSS/SPHERE      7-KB INT&
+            &   8-KB SPHERE      9-RSHIFT')")
 
   kbint = 0.e0
   kbintsphere = 0.e0
@@ -791,16 +907,17 @@ program g_solute_solvent
     ! Distance transformation
     rshift = sphereradiusfromshellvolume(shellvolume(i),binstep)
 
-    write(20,"( 9(tr2,f12.7) )") &
-    shellradius(i,binstep),&                                      ! 1-DISTANCE
-    gss(i),&                                                      ! 2-GSS
-    site_count(i),&                                               ! 3-SITE COUNT
-    shellvolume(i),&                                              ! 4-SHELL VOL
-    sphericalshellvolume(i,binstep),&                             ! 5-SPHER VOL
-    site_count(i)/(bulkdensity*sphericalshellvolume(i,binstep)),& ! 6-GSS/SPHER
-    kbint,&                                                       ! 7-KB INT
-    kbintsphere,&                                                 ! 8-KB SPHER
-    rshift                                                        ! 9-RSHIFT
+    write(20,"( 10(tr2,f12.7) )") &
+    shellradius(i,binstep),&                                      !  1-DISTANCE
+    gss(i),&                                                      !  2-GSS
+    site_count(i),&                                               !  3-SITE COUNT
+    site_count_random(i),&                                        !  4-COUNT RAND
+    shellvolume(i),&                                              !  5-SHELL VOL
+    sphericalshellvolume(i,binstep),&                             !  6-SPHER VOL
+    site_count(i)/(bulkdensity*sphericalshellvolume(i,binstep)),& !  7-GSS/SPHER
+    kbint,&                                                       !  8-KB INT
+    kbintsphere,&                                                 !  9-KB SPHER
+    rshift                                                        ! 10-RSHIFT
 
   end do
   close(20)
