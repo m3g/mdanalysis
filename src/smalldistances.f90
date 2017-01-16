@@ -5,6 +5,25 @@
 !
 ! L. Martinez, Sep 23, 2014.
 !
+! On input: 
+!    ngroup1: Number of atoms of group1 (solute)
+!    group1: Vector containing the indexes in vectors x,y,z of the atoms of group1
+!    ngroup2: Number of atoms of group2 (solvent) 
+!    group2: Vector containing the indexes in vectors x,y,z of the atoms of group2
+!    x,y,z: Coordinates of the atoms x(group1(1)), for example, is the first atom of group1
+!    cutoff: The maximum distance to be considered
+!    axisin: vector of dimension 3 containing the size of the periodic box in each dimension
+!    maxsmalld: the maximum possible number of minimum distances (maxsmalld=ngroup1*ngroup2 in
+!               the worst case)
+!
+! On output:
+!    nsmalld: Number of distances between atoms of group1 and group1 which are smaller than 'cutoff'
+!    ismalld: Index of the atom of group2 corresponding to the distance reported in vector dsmalld
+!             Note that the indexes in ismalld go from 1 to ngroup2, for the atoms of group2
+!    dsmalld: The actual distance of atom of group2 to some atom of group1 (here we do not care
+!             about the identity of the solute atom).
+!    
+!
 
 module linkedcells_smalldistances 
   integer, allocatable :: iatomfirst(:,:,:), iatomnext(:)

@@ -87,7 +87,7 @@ program g_solute_solvent
   integer, allocatable :: irandom(:), solute2(:)
   integer, allocatable :: solute(:), solvent(:), resid(:), &
                           natres(:), fatres(:), fatrsolute(:), fatrsolvent(:), &
-                          nrsolv(:), ismalld(:)
+                          irsolv(:), ismalld(:)
 
   real, allocatable :: site_count(:), random_count(:), shellvolume(:)
   real, allocatable :: gss(:)
@@ -225,7 +225,7 @@ program g_solute_solvent
   allocate( eps(natom), sig(natom), q(natom), e(natom), s(natom), mass(natom),&
             segat(natom), resat(natom), classat(natom), typeat(natom), class(natom),&
             resid(natom), natres(natom), fatres(natom), fatrsolute(natom),&
-            fatrsolvent(natom), nrsolv(natom), &
+            fatrsolvent(natom), irsolv(natom), &
             solute2(natom) )
 
   ! Reading parameter files to get the vdW sigmas for the definition of exclusion
@@ -393,12 +393,12 @@ program g_solute_solvent
       fatrsolvent(nrsolvent) = fatres(resid(solvent(i)))
       j = resid(solvent(i))
     end if
-    nrsolv(i) = nrsolvent
+    irsolv(i) = nrsolvent
   end do
 
   ! This is for the initialization of the smalldistances routine
 
-  nrandom = 5*nrsolvent
+  nrandom = 2*nrsolvent
   maxsmalld = nsolute*nrandom
   allocate( ismalld(maxsmalld), dsmalld(maxsmalld), mind(maxsmalld) )
   maxatom = max(nsolute+nrandom,natom)
@@ -570,7 +570,7 @@ program g_solute_solvent
         mind(i) = cutoff + 1.e0
       end do
       do i = 1, nsmalld
-        isolvent = nrsolv(ismalld(i))
+        isolvent = irsolv(ismalld(i))
         if ( dsmalld(i) < mind(isolvent) ) then
           mind(isolvent) = dsmalld(i)
         end if
@@ -613,13 +613,12 @@ program g_solute_solvent
       call smalldistances(nsolute,solute2,nrandom,irandom,x,y,z,cutoff,&
                           nsmalld,ismalld,dsmalld,axis,maxsmalld)
 
-!voltar: corrigir contagem de minimas distancias dos átomos fantasmas
       do i = 1, nrandom
         mind(i) = cutoff + 1.e0
       end do
       do i = 1, nsmalld
         if ( dsmalld(i) < mind(ismalld(i)) ) then
-          mind(i) = dsmalld(i)
+          mind(ismalld(i)) = dsmalld(i)
         end if
       end do 
       
