@@ -128,6 +128,7 @@ program g_solute_solvent
   nint = 5
   dbulk = 12.
   cutoff = 14.
+  binstep = 0.1e0
   
   ! Open input file and read parameters
   
@@ -139,7 +140,11 @@ program g_solute_solvent
   call getarg(1,record)
   
   inputfile = record(1:length(record))
-  open(10,file=inputfile,action='read')
+  open(10,file=inputfile,action='read',iostat=status,status='old')
+  if ( status /= 0 ) then
+    write(*,*) ' ERROR: Could not open input file: ', trim(adjustl(inputfile))
+    stop
+  end if
   do 
     read(10,"( a200 )",iostat=status) record
     if(status /= 0) exit
@@ -166,9 +171,9 @@ program g_solute_solvent
       line = value(record)
       read(line,*,iostat=keystatus) stride
       if(keystatus /= 0) exit 
-    else if(keyword(record) == 'nbins') then
+    else if(keyword(record) == 'binstep') then
       line = value(record)
-      read(line,*,iostat=keystatus) nbins
+      read(line,*,iostat=keystatus) binstep
       if(keystatus /= 0) exit 
     else if(keyword(record) == 'nint') then
       line = value(record)
@@ -259,10 +264,17 @@ program g_solute_solvent
     write(*,*) ' ERROR: The bulk volume is zero (dbulk >= cutoff). '
     stop
   end if
+  if ( dbulk-int(dbulk/binstep)*binstep > 1.e-5 ) then
+    write(*,*) ' ERROR: dbulk must be a multiple of binstep. '  
+    stop
+  end if
+  if ( (cutoff-dbulk)-int((cutoff-dbulk)/binstep)*binstep > 1.e-5 ) then
+    write(*,*) ' ERROR: (cutoff-dbulk) must be a multiple of binstep. '  
+    stop
+  end if
 
-  binstep = dbulk / float(nbins)
-  ibulk = nbins+1
   nbins = int(cutoff/binstep)
+  ibulk = int(dbulk/binstep) + 1
 
   write(*,*) ' Width of histogram bins: ', binstep
   write(*,*) ' Number of bins of histograms: ', nbins
@@ -594,6 +606,8 @@ program g_solute_solvent
       !
       ! Computing volumes for normalization
       !
+
+      ! Solute coordinates are put at the first nsolute positions of x,y,z
 
       do i = 1, nsolute
         ii = iatom + solute(i)

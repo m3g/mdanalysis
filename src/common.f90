@@ -106,7 +106,11 @@ subroutine getdim(psffile,inputfile,ndim)
                         value, file
   character :: firstchar
   
-  open(10,file=psffile,action='read')
+  open(10,file=psffile,action='read',iostat=status)
+  if ( status /= 0 ) then
+    write(*,*) ' ERROR: Could not open PSF file: ', trim(adjustl(psffile))
+    stop
+  end if
   read(10,"( a200 )") record
   do while(record /= '!NATOM')
     read(10,*,iostat=status) ndim, record
