@@ -51,8 +51,9 @@ program g_solute_solvent
   ! Static variables
 
   implicit none
+  real, parameter :: pi = 4.d0*atan(1.e0)
   integer, parameter :: memory=15000000
-  integer :: maxatom, nrandom
+  integer :: maxatom 
   integer :: natom, nsolute, nsolvent, isolute, isolvent, isolvent_random, &
              narg, length, firstframe, lastframe, stride, nclass,&
              nframes, dummyi, i, ntotat, memframes, ncycles, memlast,&
@@ -62,17 +63,16 @@ program g_solute_solvent
              nsmalld, & 
              maxsmalld, frames
   integer :: nrsolvent_random, natsolvent_random
-  real :: dbulk
-  integer :: ibulk, nintegral
-  real :: site_sum, convert
+  real :: dbulk, density_fix
+  integer :: nbulk, ibulk, nintegral
+  real :: site_sum, convert, solute_volume
   double precision :: readsidesx, readsidesy, readsidesz, t
   real :: side(memory,3), mass1, mass2, seed, random, axis(3)
-  real, parameter :: twopi = 2.*3.1415925655
   real, parameter :: mole = 6.022140857e23
   real :: dummyr, xdcd(memory), ydcd(memory), zdcd(memory),&
           time0, etime, tarray(2),&
           binstep, &
-          cutoff,  kbint, kbintsphere
+          cutoff,  kbint, kbintsphere, bulkdensity_at_frame
   real :: bulkdensity, totalvolume, bulkvolume, simdensity, solutevolume
   real :: bulkerror, sdbulkerror
   character(len=200) :: groupfile, line, record, value, keyword,&
@@ -88,12 +88,13 @@ program g_solute_solvent
 
   ! Allocatable arrays
   
-  integer, allocatable :: irandom(:), solute2(:), solvent_random(:)
+  integer, allocatable :: solute2(:), solvent_random(:)
   integer, allocatable :: solute(:), solvent(:), resid(:), &
                           natres(:), fatres(:), fatrsolute(:), fatrsolvent(:), &
                           irsolv(:), ismalld(:), irsolv_random(:)
 
-  real, allocatable :: site_count(:), site_count_random(:), random_count(:), shellvolume(:)
+  real, allocatable :: site_count(:), site_count_random(:), random_count(:), shellvolume(:),&
+                       site_count_at_frame(:)
   real, allocatable :: gss(:)
 
   real, allocatable :: eps(:), sig(:), q(:), e(:), s(:), mass(:),&
@@ -291,7 +292,8 @@ program g_solute_solvent
 
   ! Allocate gss array according to nbins
 
-  allocate( gss(nbins), site_count(nbins), site_count_random(nbins), shellvolume(nbins), random_count(nbins) )
+  allocate( gss(nbins), site_count(nbins), site_count_random(nbins), shellvolume(nbins), &
+            random_count(nbins), site_count_at_frame(nbins) )
   
   ! Check for simple input errors
   
@@ -426,11 +428,10 @@ program g_solute_solvent
 
   ! This is for the initialization of the smalldistances routine
 
-  nrandom = nintegral*nrsolvent
-  maxsmalld = nsolute*nrandom
-  allocate( ismalld(maxsmalld), dsmalld(maxsmalld), mind(maxsmalld) )
-  maxatom = max(2*natom,nsolute+nrandom)
-  allocate( x(maxatom), y(maxatom), z(maxatom), irandom(nrandom) )
+  maxsmalld = nsolute*(2*nsolvent)
+  allocate( ismalld(maxsmalld), dsmalld(maxsmalld), mind(2*nrsolvent) )
+  maxatom = 2*natom
+  allocate( x(maxatom), y(maxatom), z(maxatom) )
 
   ! Output some group properties for testing purposes
   
@@ -607,10 +608,14 @@ program g_solute_solvent
 
       ! Summing up current data to the gss histogram
 
+      do i = 1, nbins
+        site_count_at_frame(i) = 0.e0
+      end do
       do i = 1, nrsolvent
         irad = int(float(nbins)*mind(i)/cutoff)+1
         if( irad <= nbins ) then
           site_count(irad) = site_count(irad) + 1.e0
+          site_count_at_frame(irad) = site_count_at_frame(irad) + 1.e0
         end if
       end do
 
@@ -628,78 +633,34 @@ program g_solute_solvent
         solute2(i) = i
       end do
 
-      ! Very rough (over)estimate of the solute partial volume
-
-!      solute_volume = nsolute*(4./3.)*pi*8.
-
-      ! Generate nrandom random points
-
-      ii = nsolute
-      do i = 1, nrandom 
-        ii = ii + 1
-        x(ii) = -axis(1)/2. + random(seed)*axis(1) 
-        y(ii) = -axis(2)/2. + random(seed)*axis(2) 
-        z(ii) = -axis(3)/2. + random(seed)*axis(3) 
-        irandom(i) = ii
-      end do
-
-      ! Computes distances which are smaller than the cutoff
-      
-      call smalldistances(nsolute,solute2,nrandom,irandom,x,y,z,cutoff,&
-                          nsmalld,ismalld,dsmalld,axis,maxsmalld)
-
-      do i = 1, nrandom
-        mind(i) = cutoff + 1.e0
-      end do
-      do i = 1, nsmalld
-        if ( dsmalld(i) < mind(ismalld(i)) ) then
-          mind(ismalld(i)) = dsmalld(i)
-        end if
-      end do 
-      
-      ! Estimating volume of bins from count of random points 
-
-      do i = 1, nbins
-        random_count(i) = 0.e0
-      end do
-      do i = 1, nrandom
-        irad = int(float(nbins)*mind(i)/cutoff)+1
-        if ( irad <= nbins ) then
-          random_count(irad) = random_count(irad) + 1.e0
-        end if
-      end do
-
-      ! Converting counts to volume
+      ! Total volume of the box at this frame
 
       totalvolume = axis(1)*axis(2)*axis(3)
-      do i = 1, nbins
-        shellvolume(i) = shellvolume(i) + random_count(i)*totalvolume / nrandom
-      end do
 
-      ! Estimating the bulk density from site count at large distances
+      ! Very rough (over)estimate of the solute partial volume
 
-      site_sum = 0.e0
-      bulkvolume = 0.e0
-      do i = ibulk, nbins
-        site_sum = site_sum + site_count(i)
-        bulkvolume = bulkvolume + shellvolume(i)
-      end do
-      bulkdensity = bulkdensity + site_sum/bulkvolume
-      simdensity = simdensity + nrsolvent/totalvolume
+      solute_volume = nsolute*(4./3.)*pi*9.
+
+      ! First (over)esimate of the number of solvent molecules that must
+      ! be used for normalization
+
+      nrsolvent_random = nintegral*nint(nrsolvent*totalvolume/(totalvolume-solute_volume))
 
       !
-      ! Bulk density estimated, now we generate a random distribution of solvent
-      ! molecules with the appropriate density, to compute the gss in the absence
-      ! of solute-solvent interactions: site_sum/bulkvolume is the bulkdensity at
-      ! this frame, as computed above
+      ! Using this large sampling of random solvent positions, we will compute the
+      ! minimum-distance distribution function, which will we first be used only
+      ! to estimate the (minimum-distance) volume of the bulk region. Aftwerwards,
+      ! the actual normalization is computed from a subset of this solvent molecules
+      ! with the better estimate of the (minimum-distance) bulk density. 
       !
 
-      nrsolvent_random = nint(totalvolume*(site_sum/bulkvolume))
       natsolvent_random = natoms_solvent*nrsolvent_random
 
-      if ( nrsolvent_random > size( solvent_random ) ) then
+      ! Checking the size of the arrays and updating if necessary
+
+      if ( natsolvent_random > size( solvent_random ) ) then
         deallocate( solvent_random, irsolv_random ) 
-        allocate( solvent_random(nrsolvent_random), irsolv_random(nrsolvent_random) )
+        allocate( solvent_random(natsolvent_random), irsolv_random(natsolvent_random) )
       end if
       if ( nsolute+natsolvent_random > size(x) ) then
         deallocate( x, y, z )
@@ -707,7 +668,14 @@ program g_solute_solvent
                   y(nsolute+natsolvent_random), &
                   z(nsolute+natsolvent_random) )
       end if
-     
+      if ( natsolvent_random*nsolute > size(dsmalld) ) then
+        deallocate( dsmalld, ismalld ) 
+        allocate( dsmalld(natsolvent_random*nsolute), ismalld(natsolvent_random*nsolute) )
+      end if
+      if ( nrsolvent_random > size(mind) ) then
+        deallocate( mind )
+        allocate( mind(nrsolvent_random) )
+      end if
 
       do isolvent_random = 1, nrsolvent_random
 
@@ -750,9 +718,9 @@ program g_solute_solvent
         cmx = -axis(1)/2. + random(seed)*axis(1) 
         cmy = -axis(2)/2. + random(seed)*axis(2) 
         cmz = -axis(3)/2. + random(seed)*axis(3) 
-        beta = random(seed)*twopi
-        gamma = random(seed)*twopi
-        theta = random(seed)*twopi
+        beta = random(seed)*2.e0*pi
+        gamma = random(seed)*2.e0*pi
+        theta = random(seed)*2.e0*pi
         call compcart(natoms_solvent,xref,yref,zref,xrnd,yrnd,zrnd,&
                       cmx,cmy,cmz,beta,gamma,theta)
 
@@ -776,9 +744,8 @@ program g_solute_solvent
       call smalldistances(nsolute,solute2,natsolvent_random,solvent_random,x,y,z,cutoff,&
                           nsmalld,ismalld,dsmalld,axis,maxsmalld)
 
-      !
-      ! Computing the gss functions from distance data
-      !
+      ! Up to now, we are only interested in the site count in the bulk region, as set
+      ! by the user 
 
       do i = 1, nrsolvent_random
         mind(i) = cutoff + 1.e0
@@ -789,13 +756,49 @@ program g_solute_solvent
           mind(isolvent) = dsmalld(i)
         end if
       end do
+      
+      ! Compute the fraction of minimum distance sites found at the bulk volume region
 
-      ! Summing up current data to the gss histogram
+      nbulk = 0
+      do i = 1, nrsolvent_random
+        if ( mind(i) >= dbulk .and. mind(i) <= cutoff ) then
+          nbulk = nbulk + 1
+        end if
+      end do
+
+      ! The minimum-distance volume of the bulk is, then...
+
+      bulkvolume = (float(nbulk)/nrsolvent_random)*totalvolume 
+
+      ! Therefore, since we have already computed the gss at these distances,
+      ! we can estimate the minimum-distance bulk density
+
+      site_sum = 0.e0
+      do i = ibulk, nbins
+        site_sum = site_sum + site_count_at_frame(i)
+      end do
+      bulkdensity_at_frame = site_sum/bulkvolume
+
+      ! These are averaged at the end for final report:
+
+      simdensity = simdensity + nrsolvent/totalvolume
+      bulkdensity = bulkdensity + bulkdensity_at_frame
+
+      ! With the bulk density properly estimated, we now compute the total
+      ! number of random molecules that should actually be used for normalization, 
+      ! which should be bulkdensity*totalvolume. Therefore, the site count above
+      ! is overstimated because the density is greater than the actual desired 
+      ! density by
+
+      density_fix = (bulkdensity_at_frame*totalvolume)/nrsolvent_random
+
+      ! So lets count the sites at each bin distance for the ideal gas distribution
+      ! rescaled for the correct density
 
       do i = 1, nrsolvent_random
         irad = int(float(nbins)*mind(i)/cutoff)+1
         if ( irad <= nbins ) then
-          site_count_random(irad) = site_count_random(irad) + 1.e0
+          site_count_random(irad) = site_count_random(irad) + 1.e0*density_fix
         end if
       end do
 
@@ -965,7 +968,8 @@ real function sphericalshellvolume(i,step)
   implicit none
   integer :: i
   real :: step, rmin
-  real, parameter :: fourthirdsofpi = (4./3.)*3.1415925655
+  real, parameter :: pi = 4.d0*atan(1.e0)
+  real, parameter :: fourthirdsofpi = (4./3.)*pi
 
   rmin = (i-1)*step
   sphericalshellvolume = fourthirdsofpi*( (rmin+step)**3 - rmin**3 )
@@ -993,8 +997,8 @@ real function sphereradiusfromshellvolume(volume,step)
  
   implicit none
   real :: volume, step, rmin
-  real, parameter :: pi = 3.1415925655
-  real, parameter :: fourthirdsofpi = (4./3.)*3.1415925655
+  real, parameter :: pi = 4.d0*atan(1.e0)
+  real, parameter :: fourthirdsofpi = (4./3.)*pi
   
   if ( 3*step*volume - pi*step**4 <= 0.d0 ) then
     sphereradiusfromshellvolume = 0.d0
