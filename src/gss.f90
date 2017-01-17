@@ -889,7 +889,7 @@ program g_solute_solvent
   sdbulkerror = sqrt(sdbulkerror/(nbins-ibulk+1))
   write(*,*)
   write(*,"('  Average and standard deviation of bulk-gss: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
-  write(29,"('#')")
+  write(20,"('#')")
   write(20,"('# Average and standard deviation of bulk-gss: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
 
   ! Output table
