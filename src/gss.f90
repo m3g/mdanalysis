@@ -812,16 +812,18 @@ program g_solute_solvent
   end do
   close(10)
 
+  !
   ! Averaging results on the number of frames
+  !
 
   bulkdensity = bulkdensity / frames
   simdensity = simdensity / frames
   do i = 1, nbins
+    site_count(i) = site_count(i)/frames
+    site_count_random(i) = site_count_random(i)/frames
     shellvolume(i) = site_count_random(i)/bulkdensity
-    site_count(i) = site_count(i) / frames
-    site_count_random(i) = site_count_random(i) / frames
     if ( site_count_random(i) > 0.e0 ) then
-      gss(i) = site_count(i) / site_count_random(i)
+      gss(i) = site_count(i)/site_count_random(i)
     else
       gss(i) = 0.e0
     end if
@@ -917,7 +919,8 @@ program g_solute_solvent
     kbint = kbint + convert*(gss(i)-1.e0)*shellvolume(i)
 
     ! KB integral using spherical shell volume 
-    kbintsphere = kbintsphere + convert*(gss(i)-1.e0)*sphericalshellvolume(i,binstep)
+    kbintsphere = kbintsphere + &
+                  convert*(site_count(i)/(bulkdensity*sphericalshellvolume(i,binstep))-1.e0)*sphericalshellvolume(i,binstep)
 
     ! Distance transformation
     rshift = sphereradiusfromshellvolume(shellvolume(i),binstep)
