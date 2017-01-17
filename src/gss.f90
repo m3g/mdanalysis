@@ -93,7 +93,8 @@ program g_solute_solvent
                           natres(:), fatres(:), fatrsolute(:), fatrsolvent(:), &
                           irsolv(:), ismalld(:), irsolv_random(:)
 
-  real, allocatable :: site_count(:), site_count_random(:), random_count(:), shellvolume(:),&
+  double precision, allocatable :: site_count_random(:)
+  real, allocatable :: site_count(:), shellvolume(:),&
                        site_count_at_frame(:)
   real, allocatable :: gss(:)
 
@@ -293,7 +294,7 @@ program g_solute_solvent
   ! Allocate gss array according to nbins
 
   allocate( gss(nbins), site_count(nbins), site_count_random(nbins), shellvolume(nbins), &
-            random_count(nbins), site_count_at_frame(nbins) )
+            site_count_at_frame(nbins) )
   
   ! Check for simple input errors
   
@@ -511,7 +512,6 @@ program g_solute_solvent
   
   do i = 1, nbins
     site_count(i) = 0.e0
-    random_count(i) = 0.e0
     site_count_random(i) = 0.e0
     shellvolume(i) = 0.e0
   end do
