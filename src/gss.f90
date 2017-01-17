@@ -817,7 +817,7 @@ program g_solute_solvent
   bulkdensity = bulkdensity / frames
   simdensity = simdensity / frames
   do i = 1, nbins
-    shellvolume(i) = shellvolume(i) / frames
+    shellvolume(i) = site_count_random(i)/bulkdensity
     site_count(i) = site_count(i) / frames
     site_count_random(i) = site_count_random(i) / frames
     if ( site_count_random(i) > 0.e0 ) then
@@ -896,15 +896,15 @@ program g_solute_solvent
 
   write(20,"( '# COLUMNS CORRESPOND TO: ',/,&
   &'#       1  Minimum distance to solute (dmin)',/,&
-  &'#       2  GSS normalized by the GSS RAND distribution. ',/,&
-  &'#       3  GSS normalized according to spherical volume of radius dmin.',/,&
-  &'#       4  Site count for each dmin, averaged over frames',/,&
-  &'#       5  Cumulative sum of sites, averaged over the number of frames  ',/,&
-  &'#       6  Site count computed from random solvent distribution, averaged over frames.',/,&
-  &'#       7  Cumulative sum of sites for the random distribution, averaged over frames.',/,&
-  &'#       8  Kirwood-Buff integral (cc/mol) computed from column 2 with volume estimated from col 6 (int V(r)*(gss-1) dr ',/,&
+  &'#       2  GSS distribution, normalized by ideal gas distribution. ',/,&
+  &'#       3  Site count for each dmin (GSS without normalization).',/,&
+  &'#       4  Site count for ideal gas distribution.',/,&
+  &'#       5  Shell volume associated with each dmin. ',/,&
+  &'#       6  Spherical shell volume with radius dmin. ',/,&
+  &'#       7  GSS normalized with spherical shell volume. ',/,&
+  &'#       8  Kirwood-Buff integral (cc/mol) computed from column 2. ',/,&
   &'#       9  Kirwood-Buff integral (cc/mol) computed from column 2 with spherical shell volume (int 4*pi*r^2*(gss-1) dr ',/,&
-  &'#      10  Spherical shifted minimum distance ')")
+  &'#      10  Spherical-shifted minimum distance ')")
   write(20,"('#')")
   write(20,"('#   1-DISTANCE         2-GSS  3-SITE COUNT  4-COUNT RAND   5-SHELL VOL  6-SPHERE VOL  7-GSS/SPHERE      8-KB INT&
             &   9-KB SPHERE     10-RSHIFT')")
