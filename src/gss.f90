@@ -53,7 +53,7 @@ program g_solute_solvent
   implicit none
   integer, parameter :: memory=15000000
   integer :: maxatom, nrandom
-  integer :: natom, nsolute, nsolvent, isolute, isolvent, &
+  integer :: natom, nsolute, nsolvent, isolute, isolvent, isolvent_random, &
              narg, length, firstframe, lastframe, stride, nclass,&
              nframes, dummyi, i, ntotat, memframes, ncycles, memlast,&
              j, iframe, icycle, nfrcycle, iatom, k, ii, &
@@ -61,7 +61,7 @@ program g_solute_solvent
              nrsolvent, kframe, irad, nbins, natoms_solvent,&
              nsmalld, & 
              maxsmalld, frames
-  integer :: nrsolvent_random
+  integer :: nrsolvent_random, natsolvent_random
   real :: dbulk
   integer :: ibulk, nintegral
   real :: site_sum, convert
@@ -429,7 +429,7 @@ program g_solute_solvent
   nrandom = nintegral*nrsolvent
   maxsmalld = nsolute*nrandom
   allocate( ismalld(maxsmalld), dsmalld(maxsmalld), mind(maxsmalld) )
-  maxatom = 2*natom
+  maxatom = max(2*natom,nsolute+nrandom)
   allocate( x(maxatom), y(maxatom), z(maxatom), irandom(nrandom) )
 
   ! Output some group properties for testing purposes
@@ -628,6 +628,10 @@ program g_solute_solvent
         solute2(i) = i
       end do
 
+      ! Very rough (over)estimate of the solute partial volume
+
+!      solute_volume = nsolute*(4./3.)*pi*8.
+
       ! Generate nrandom random points
 
       ii = nsolute
@@ -691,13 +695,21 @@ program g_solute_solvent
       !
 
       nrsolvent_random = nint(totalvolume*(site_sum/bulkvolume))
+      natsolvent_random = natoms_solvent*nrsolvent_random
 
       if ( nrsolvent_random > size( solvent_random ) ) then
         deallocate( solvent_random, irsolv_random ) 
         allocate( solvent_random(nrsolvent_random), irsolv_random(nrsolvent_random) )
       end if
+      if ( nsolute+natsolvent_random > size(x) ) then
+        deallocate( x, y, z )
+        allocate( x(nsolute+natsolvent_random), &
+                  y(nsolute+natsolvent_random), &
+                  z(nsolute+natsolvent_random) )
+      end if
+     
 
-      do isolvent = 1, nrsolvent_random
+      do isolvent_random = 1, nrsolvent_random
 
         ! First, pick randomly a solvent molecule from the box, to minimize conformational
         ! biases of the solvent molecules
@@ -747,13 +759,13 @@ program g_solute_solvent
         ! Add this molecule to x, y, z arrays
 
         do i = 1, natoms_solvent
-          ii = nsolute + (isolvent-1)*natoms_solvent + i
+          ii = nsolute + (isolvent_random-1)*natoms_solvent + i
           x(ii) = xrnd(i)
           y(ii) = yrnd(i)
           z(ii) = zrnd(i)
           solvent_random(ii-nsolute) = ii
           ! Annotate to which molecule this atom pertains
-          irsolv_random(ii-nsolute) = isolvent
+          irsolv_random(ii-nsolute) = isolvent_random
         end do
 
       end do
@@ -761,7 +773,7 @@ program g_solute_solvent
       ! The solute atom was already added to the xyz array for computing volumes, so now
       ! we have only to compute the distances
 
-      call smalldistances(nsolute,solute2,nrsolvent_random,solvent_random,x,y,z,cutoff,&
+      call smalldistances(nsolute,solute2,natsolvent_random,solvent_random,x,y,z,cutoff,&
                           nsmalld,ismalld,dsmalld,axis,maxsmalld)
 
       !
@@ -891,8 +903,8 @@ program g_solute_solvent
   &'#       9  Kirwood-Buff integral (cc/mol) computed from column 2 with spherical shell volume (int 4*pi*r^2*(gss-1) dr ',/,&
   &'#      10  Spherical shifted minimum distance ')")
   write(20,"('#')")
-  write(20,"('#   1-DISTANCE         2-GSS  3-COUNT RAND  3-SITE COUNT   4-SHELL VOL  5-SPHERE VOL  6-GSS/SPHERE      7-KB INT&
-            &   8-KB SPHERE      9-RSHIFT')")
+  write(20,"('#   1-DISTANCE         2-GSS  3-SITE COUNT  4-COUNT RAND   5-SHELL VOL  6-SPHERE VOL  7-GSS/SPHERE      8-KB INT&
+            &   9-KB SPHERE     10-RSHIFT')")
 
   kbint = 0.e0
   kbintsphere = 0.e0
