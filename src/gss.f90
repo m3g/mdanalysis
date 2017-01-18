@@ -93,7 +93,7 @@ program g_solute_solvent
                           natres(:), fatres(:), fatrsolute(:), fatrsolvent(:), &
                           irsolv(:), ismalld(:), irsolv_random(:)
 
-  double precision, allocatable :: site_count_random(:)
+  real, allocatable :: site_count_random(:)
   real, allocatable :: site_count(:), shellvolume(:),&
                        site_count_at_frame(:)
   real, allocatable :: gss(:)
