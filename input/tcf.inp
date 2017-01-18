@@ -20,7 +20,7 @@
 # the vectors that are output in the first frame over the structure,
 # using the "draw line" VMD command. 
 #
-# Version 17.004
+# Version 17.018
 #
 
 # DCD trajectory files: 
