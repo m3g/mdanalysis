@@ -567,6 +567,14 @@ program g_solute_solvent
       axis(2) = side(kframe,2) 
       axis(3) = side(kframe,3) 
 
+      if ( cutoff > axis(1)/2.e0 .or. &
+           cutoff  > axis(2)/2.e0 .or. &
+           cutoff > axis(3)/2.d0 ) then
+        write(*,*)
+        write(*,*) " ERROR: cutoff > periodic_dimension/2 "
+        stop
+      end if
+
       !
       ! Computing the GSS data the simulation
       !
