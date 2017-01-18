@@ -61,7 +61,7 @@ program g_solute_solvent
              status, keystatus, iargc, lastatom, nres, nrsolute,&
              nrsolvent, kframe, irad, nbins, natoms_solvent,&
              nsmalld, & 
-             maxsmalld, frames
+             frames
   integer :: nrsolvent_random, natsolvent_random
   real :: dbulk, density_fix
   integer :: nbulk, ibulk, nintegral
@@ -429,8 +429,7 @@ program g_solute_solvent
 
   ! This is for the initialization of the smalldistances routine
 
-  maxsmalld = nsolute*(2*nsolvent)
-  allocate( ismalld(maxsmalld), dsmalld(maxsmalld), mind(2*nrsolvent) )
+  allocate( ismalld(nsolute*(2*nsolvent)), dsmalld(nsolute*(2*nsolvent)), mind(2*nrsolvent) )
   maxatom = 2*natom
   allocate( x(maxatom), y(maxatom), z(maxatom) )
 
@@ -588,7 +587,7 @@ program g_solute_solvent
       ! Compute all distances that are smaller than the cutoff
 
       call smalldistances(nsolute,solute,nsolvent,solvent,x,y,z,cutoff,&
-                          nsmalld,ismalld,dsmalld,axis,maxsmalld)
+                          nsmalld,ismalld,dsmalld,axis)
 
       !
       ! Computing the gss functions from distance data
@@ -742,7 +741,7 @@ program g_solute_solvent
       ! we have only to compute the distances
 
       call smalldistances(nsolute,solute2,natsolvent_random,solvent_random,x,y,z,cutoff,&
-                          nsmalld,ismalld,dsmalld,axis,maxsmalld)
+                          nsmalld,ismalld,dsmalld,axis)
 
       ! Up to now, we are only interested in the site count in the bulk region, as set
       ! by the user 
