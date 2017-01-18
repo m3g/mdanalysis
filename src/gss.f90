@@ -131,7 +131,7 @@ program g_solute_solvent
   periodic = .true.
   readfromdcd = .true.
   nbins = 1000
-  nintegral = 5
+  nintegral = 10
   dbulk = 12.
   cutoff = 14.
   binstep = 0.1e0
