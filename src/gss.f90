@@ -77,7 +77,7 @@ program g_solute_solvent
   real :: bulkerror, sdbulkerror
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
-                        output
+                        output, numberformat
   character(len=4) :: dummyc
   logical :: readfromdcd, dcdaxis, periodic 
   real :: shellradius, rshift
@@ -931,6 +931,11 @@ program g_solute_solvent
 
     ! Distance transformation
     rshift = sphereradiusfromshellvolume(shellvolume(i),binstep)
+
+    numberformat = "(10(tr2,f12.7))"
+    if ( abs(kbint) > 999.e0 .or. abs(kbintsphere) > 999.e0 ) then
+      numberformat = "(7(tr2,f12.7),2(tr2,e12.5),(tr2,f12.7))"
+    end if
 
     write(20,"( 10(tr2,f12.7) )") &
     shellradius(i,binstep),&                                      !  1-DISTANCE
