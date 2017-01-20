@@ -4,26 +4,21 @@
 !
 !      Important: THIS IS NOT THE CLASSICAL RADIAL DISTRIBUTION
 !                 FUNCTION. It is the shape-dependent RDF used
-!                 for non-spherical species. It will only coincide
+!                 for non-spherical solutes. It will only coincide
 !                 with the classical RDF for perfectly spherical
-!                 species. The normalization of this distribution 
+!                 solutes, for instance if single atoms are used
+!                 to define the solute and the solvent. 
+!                 The normalization of this distribution 
 !                 function is more complicated than the normalization
 !                 of the radial distribution function for spherical
-!                 solutes. Here, we estimate the volume of the 
-!                 solute* by partitioning the space into bins
-!                 of side "probeside", and count how many bins contain
-!                 atoms of the solute. With this estimate of the
-!                 volume of the solute, the number of solvent
-!                 that would be present in the simulation box for
-!                 the same solvent density, but without the solute,
-!                 is calculated. This number of random solvent molecules
-!                 is then generated, and the gss relative to the
-!                 solute for these molecules is computed for 
-!                 normalization. This procedure is performed 
-!                 independently for each solute structure in each
-!                 frame of the trajectory.
-!                 *The volume can be of a different selection than
-!                  the solute selection.
+!                 solutes. Here, the bulk density of the solvent
+!                 is estimated by the counting at long distances, and
+!                 a random distribution of solvent molecules is used
+!                 to estimate the volumes corresponding to each 
+!                 minimum distance count. The normalization if done
+!                 by dividing the actual count of sites by the
+!                 expected non-interacting count estimated from this volume
+!                 and the estimated bulk density.
 !
 ! Please cite the following reference when using this package:
 !
@@ -77,7 +72,7 @@ program g_solute_solvent
   real :: bulkerror, sdbulkerror
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
-                        output, numberformat
+                        output, lineformat, gssperatom
   character(len=4) :: dummyc
   logical :: readfromdcd, dcdaxis, periodic 
   real :: shellradius, rshift
@@ -92,11 +87,13 @@ program g_solute_solvent
   integer, allocatable :: solute(:), solvent(:), resid(:), &
                           natres(:), fatres(:), fatrsolute(:), fatrsolvent(:), &
                           irsolv(:), ismalld(:), irsolv_random(:)
+  integer, allocatable :: imind(:)
 
   real, allocatable :: site_count_random(:)
   real, allocatable :: site_count(:), shellvolume(:),&
                        site_count_at_frame(:)
   real, allocatable :: gss(:)
+  real, allocatable :: gss_per_atom(:,:)
 
   real, allocatable :: eps(:), sig(:), q(:), e(:), s(:), mass(:),&
                        solvent_molecule(:,:), &
@@ -135,6 +132,11 @@ program g_solute_solvent
   dbulk = 12.
   cutoff = 14.
   binstep = 0.1e0
+
+  ! Default output file names
+
+  output = "gss.dat"
+  gssperatom = "gssperatom.dat"
   
   ! Open input file and read parameters
   
@@ -212,6 +214,9 @@ program g_solute_solvent
     else if(keyword(record) == 'output') then
       output = value(record)
       write(*,*) ' GSS output file name: ', output(1:length(output))
+    else if(keyword(record) == 'gssperatom') then
+      gssperatom = value(record)
+      write(*,*) ' GSS per-atom output file name: ', gssperatom(1:length(output))
     else if(keyword(record) == 'solute' .or. &
             keyword(record) == 'solvent') then
       write(*,"(a,/,a)") ' ERROR: The options solute and solvent must be used ',&
@@ -429,7 +434,8 @@ program g_solute_solvent
 
   ! This is for the initialization of the smalldistances routine
 
-  allocate( ismalld(nsolute*(2*nsolvent)), dsmalld(nsolute*(2*nsolvent)), mind(2*nrsolvent) )
+  allocate( ismalld(nsolute*(2*nsolvent)), dsmalld(nsolute*(2*nsolvent)), mind(2*nrsolvent), &
+            imind(nrsolvent) )
   maxatom = 2*natom
   allocate( x(maxatom), y(maxatom), z(maxatom) )
 
@@ -461,7 +467,8 @@ program g_solute_solvent
   
   allocate( solvent_molecule(natoms_solvent,3), &
             xref(natoms_solvent), yref(natoms_solvent), zref(natoms_solvent),&
-            xrnd(natoms_solvent), yrnd(natoms_solvent), zrnd(natoms_solvent) )
+            xrnd(natoms_solvent), yrnd(natoms_solvent), zrnd(natoms_solvent),& 
+            gss_per_atom(natoms_solvent,nbins) )
   
   ! Checking if dcd file contains periodic cell information
   
@@ -513,6 +520,9 @@ program g_solute_solvent
     site_count(i) = 0.e0
     site_count_random(i) = 0.e0
     shellvolume(i) = 0.e0
+    do j = 1, natoms_solvent
+      gss_per_atom(j,i) = 0.e0
+    end do
   end do
   bulkdensity = 0.e0
   simdensity = 0.e0
@@ -605,11 +615,13 @@ program g_solute_solvent
     
       do i = 1, nrsolvent
         mind(i) = cutoff + 1.e0
+        imind(i) = 0
       end do
       do i = 1, nsmalld
         isolvent = irsolv(ismalld(i))
         if ( dsmalld(i) < mind(isolvent) ) then
           mind(isolvent) = dsmalld(i)
+          imind(isolvent) = mod(ismalld(i),natoms_solvent)+1
         end if
       end do
 
@@ -623,6 +635,9 @@ program g_solute_solvent
         if( irad <= nbins ) then
           site_count(irad) = site_count(irad) + 1.e0
           site_count_at_frame(irad) = site_count_at_frame(irad) + 1.e0
+          if ( imind(i) > 0 ) then
+            gss_per_atom(imind(i),irad) = gss_per_atom(imind(i),irad) + 1.e0
+          end if
         end if
       end do
 
@@ -831,8 +846,15 @@ program g_solute_solvent
     shellvolume(i) = site_count_random(i)/bulkdensity
     if ( site_count_random(i) > 0.e0 ) then
       gss(i) = site_count(i)/site_count_random(i)
+      do j = 1, natoms_solvent
+        gss_per_atom(j,i) = gss_per_atom(j,i)/frames  
+        gss_per_atom(j,i) = gss_per_atom(j,i)/site_count_random(i)
+      end do
     else
       gss(i) = 0.e0
+      do j = 1, natoms_solvent
+        gss_per_atom(j,i) = 0.e0
+      end do
     end if
   end do
 
@@ -932,9 +954,9 @@ program g_solute_solvent
     ! Distance transformation
     rshift = sphereradiusfromshellvolume(shellvolume(i),binstep)
 
-    numberformat = "(10(tr2,f12.7))"
+    lineformat = "(10(tr2,f12.7))"
     if ( abs(kbint) > 999.e0 .or. abs(kbintsphere) > 999.e0 ) then
-      numberformat = "(7(tr2,f12.7),2(tr2,e12.5),(tr2,f12.7))"
+      lineformat = "(7(tr2,f12.7),2(tr2,e12.5),(tr2,f12.7))"
     end if
 
     write(20,"( 10(tr2,f12.7) )") &
@@ -952,6 +974,29 @@ program g_solute_solvent
   end do
   close(20)
 
+  ! Writting gss per atom contributions 
+
+  open(20,file=gssperatom)
+  write(20,"(a)") "# GSS contribution per atom. "
+  write(20,"( '#',/,&
+             &'# Input file: ',a,/,& 
+             &'# DCD file: ',a,/,& 
+             &'# Group file: ',a,/,&
+             &'# PSF file: ' )")
+  write(20,"(a)") "#"
+  write(20,"(a)") "# Atoms: "
+  do i = 1, natoms_solvent
+    write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solvent(i)), classat(solvent(i)), mass(solvent(i))
+  end do
+  write(20,"(a)") "#"
+  write(lineformat,*) "('#',t7,'DISTANCE     GSS TOTAL',",natoms_solvent,"(tr2,i12) )"
+  write(20,lineformat) (i,i=1,natoms_solvent)
+  write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
+  do i = 1, nbins
+    write(20,lineformat) shellradius(i,binstep), gss(i), (gss_per_atom(j,i),j=1,natoms_solvent)
+  end do
+  close(20)
+
   ! Write final messages with names of output files and their content
   
   time0 = etime(tarray) - time0
@@ -960,7 +1005,8 @@ program g_solute_solvent
   write(*,*)
   write(*,*) ' OUTPUT FILES: ' 
   write(*,*)
-  write(*,*) ' Wrote GSS output file: ', output(1:length(output))
+  write(*,*) ' Wrote GSS output file: ', trim(adjustl(output))
+  write(*,*) ' Wrote GSS per atom output file: ', trim(adjustl(gssperatom))
   write(*,*)
   write(*,*) ' Which contains the volume-normalized and'
   write(*,*) ' unnormalized gss functions. '
