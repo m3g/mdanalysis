@@ -959,7 +959,7 @@ program g_solute_solvent
       lineformat = "(7(tr2,f12.7),2(tr2,e12.5),(tr2,f12.7))"
     end if
 
-    write(20,"( 10(tr2,f12.7) )") &
+    write(20,lineformat) &
     shellradius(i,binstep),&                                      !  1-DISTANCE
     gss(i),&                                                      !  2-GSS
     site_count(i),&                                               !  3-SITE COUNT
