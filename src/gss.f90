@@ -621,7 +621,9 @@ program g_solute_solvent
         isolvent = irsolv(ismalld(i))
         if ( dsmalld(i) < mind(isolvent) ) then
           mind(isolvent) = dsmalld(i)
-          imind(isolvent) = mod(ismalld(i),natoms_solvent)+1
+          j = mod(ismalld(i),natoms_solvent) 
+          if ( j == 0 ) j = natoms_solvent
+          imind(isolvent) = j
         end if
       end do
 
