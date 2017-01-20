@@ -20,6 +20,9 @@ solvent resname TIP3 and name OH2
 # Output GSS file:
 output gss.dat
 
+# Output of atomic contributions to gss:
+gssperatom gssperatom.dat
+
 # Options to consider frames
 firstframe 1
 lastframe last
