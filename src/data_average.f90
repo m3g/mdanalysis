@@ -109,8 +109,20 @@ program data_average
 
     end do
     close(10)
-    write(*,"(a,a,a,i8)") "# Number of data points in file: ", &
-                          trim(adjustl(data(i)%file)), ": ", data(i)%n
+    if ( ndata <= 20 ) then
+      write(*,"(a,a,a,i8)") "# Number of data points in file: ", &
+                            trim(adjustl(data(i)%file)), ": ", data(i)%n
+    end if
+    if ( ndata > 20 ) then
+      if ( i <= 5 .or. i > ndata - 5 ) then
+        write(*,"(a,a,a,i8)") "# Number of data points in file: ", &
+                              trim(adjustl(data(i)%file)), ": ", data(i)%n
+      end if
+      if ( i == 5 ) then
+        write(*,"(' # ... (omitting details)')")
+      end if
+    end if
+
     allocate(data(i)%x(data(i)%n))
     allocate(data(i)%y(data(i)%n))
 
