@@ -119,7 +119,7 @@ program data_average
                               trim(adjustl(data(i)%file)), ": ", data(i)%n
       end if
       if ( i == 5 ) then
-        write(*,"(' # ... (omitting details)')")
+        write(*,"('# ... (omitting details)')")
       end if
     end if
 
