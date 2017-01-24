@@ -53,8 +53,9 @@ binstep 0.02
 # proportional to nint).  
 nint 10
 
-
-
+# Use this option if you are running the package and printing the output
+# on the screen:
+#onscreenprogress
 
 
 

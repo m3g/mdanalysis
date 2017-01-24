@@ -74,7 +74,7 @@ program g_solute_solvent
                         dcdfile, inputfile, psffile, file,&
                         output, lineformat, gssperatom
   character(len=4) :: dummyc
-  logical :: readfromdcd, dcdaxis, periodic 
+  logical :: readfromdcd, dcdaxis, periodic, onscreenprogress
   real :: shellradius, rshift
   real :: sphericalshellvolume, sphereradiusfromshellvolume
 
@@ -132,6 +132,7 @@ program g_solute_solvent
   dbulk = 12.
   cutoff = 14.
   binstep = 0.1e0
+  onscreenprogress = .false.
 
   ! Default output file names
 
@@ -195,6 +196,8 @@ program g_solute_solvent
       line = value(record)
       read(line,*,iostat=keystatus) dbulk
       if(keystatus /= 0) exit 
+    else if(keyword(record) == 'onscreenprogress') then
+      onscreenprogress = .true.
     else if(keyword(record) == 'periodic') then
       line = value(record)
       read(line,*,iostat=keystatus) line
@@ -828,7 +831,13 @@ program g_solute_solvent
 
       ! Write progress
 
-      write(*,"( 7a,f6.2,'%' )",advance='no') (char(8),i=1,7), 100.*float(kframe)/nfrcycle
+      if ( onscreenprogress ) then
+        write(*,"( 7a,f6.2,'%' )",advance='no') (char(8),i=1,7), 100.*float(kframe)/nfrcycle
+      else
+        if ( mod(iframe,max(1,(frames/1000))) == 0 ) then
+          write(*,"( '  Progress: ',f6.2,'%' )") 100.*float(kframe)/nfrcycle
+        end if
+      end if
   
       iatom = iatom + ntotat
     end do
