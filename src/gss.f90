@@ -219,7 +219,7 @@ program g_solute_solvent
       write(*,*) ' GSS output file name: ', output(1:length(output))
     else if(keyword(record) == 'gssperatom') then
       gssperatom = value(record)
-      write(*,*) ' GSS per-atom output file name: ', gssperatom(1:length(output))
+      write(*,*) ' GSS per-atom output file name: ', gssperatom(1:length(gssperatom))
     else if(keyword(record) == 'solute' .or. &
             keyword(record) == 'solvent') then
       write(*,"(a,/,a)") ' ERROR: The options solute and solvent must be used ',&
@@ -535,8 +535,10 @@ program g_solute_solvent
   iframe = 0
   do icycle = 1, ncycles 
    
-    write(*,"( t3,'Cycle',t10,i5,tr2,' Reading: ',f6.2,'%')",&
-          advance='no') icycle, 0. 
+    if ( onscreenprogress ) then
+      write(*,"( t3,'Cycle',t10,i5,tr2,' Reading: ',f6.2,'%')",&
+            advance='no') icycle, 0. 
+    end if
   
     ! Each cycle fills the memory as specified by the memory parameter 
   
@@ -558,10 +560,14 @@ program g_solute_solvent
       read(10) (ydcd(k), k = iatom + 1, iatom + lastatom)            
       read(10) (zdcd(k), k = iatom + 1, iatom + lastatom)           
       iatom = iatom + ntotat
-      write(*,"( 7a,f6.2,'%' )",advance='no')&
-           (char(8),i=1,7), 100.*float(kframe)/nfrcycle
+      if ( onscreenprogress ) then
+        write(*,"( 7a,f6.2,'%' )",advance='no')&
+             (char(8),i=1,7), 100.*float(kframe)/nfrcycle
+      end if
     end do
-    write(*,"(' Computing: ',f6.2,'%')",advance='no') 0.
+    if ( onscreenprogress ) then
+      write(*,"(' Computing: ',f6.2,'%')",advance='no') 0.
+    end if
   
     ! Computing the gss function
   
