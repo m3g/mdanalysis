@@ -841,7 +841,7 @@ program g_solute_solvent
         write(*,"( 7a,f6.2,'%' )",advance='no') (char(8),i=1,7), 100.*float(kframe)/nfrcycle
       else
         if ( mod(iframe,max(1,(frames/1000))) == 0 ) then
-          write(*,"( '  Progress: ',f6.2,'%' )") 100.*float(kframe)/nfrcycle
+          write(*,"( '  Progress: ',f6.2,'%' )") 100.*float(iframe)/frames
         end if
       end if
   
