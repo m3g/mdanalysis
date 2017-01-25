@@ -16,17 +16,21 @@ program data_average
   type data_type
     character(len=200) :: file
     integer :: n
+    double precision :: xmin, xmax
     double precision, allocatable :: x(:), y(:), yint(:)
   end type data_type
 
   integer :: narg, iargc, ioerr
-  integer :: i, j, k
-  integer :: ndata, xcol, ycol, nint
+  integer :: i, j, k, nomit
+  integer :: ndata, xcol, ycol, nint, nj
   double precision :: xmin, xmax, step, xread, yread, xlast, xint
   double precision :: interpolate, sd
   double precision, allocatable :: average(:)
-  character(len=200) :: record, record2
+  character(len=200) :: record, record2, lineformat
   type(data_type), allocatable :: data(:)
+
+  ! Maximum number of data sets for which the output is extensive:
+  nomit = 20
 
   narg = iargc()
   if ( narg < 4 ) then
@@ -59,6 +63,8 @@ program data_average
   do i = 1, ndata
 
     data(i)%n = 0
+    data(i)%xmin = 1.d30
+    data(i)%xmax = -1.d30
 
     j = j + 1
     call getarg(j,data(i)%file)
@@ -92,6 +98,8 @@ program data_average
       if ( ioerr /= 0 ) cycle
 
       data(i)%n = data(i)%n + 1
+      data(i)%xmin = min(data(i)%xmin,xread)
+      data(i)%xmax = max(data(i)%xmax,xread)
 
       xmin = min(xmin,xread)
       xmax = max(xmax,xread)
@@ -109,11 +117,17 @@ program data_average
 
     end do
     close(10)
-    if ( ndata <= 20 ) then
-      write(*,"(a,a,a,i8)") "# Number of data points in file: ", &
-                            trim(adjustl(data(i)%file)), ": ", data(i)%n
+    if ( ndata <= nomit ) then
+      lineformat = "(a,i8,tr2,a,a,i8,a,f17.5,a,f17.5,a)"
+      if ( abs(data(i)%xmin) > 1d5 .or. abs(data(i)%xmax) > 1d5 ) then
+        lineformat = "(a,i8,tr2,a,a,i8,a,e17.5,a,e17.5,a)"
+      end if
+      write(*,lineformat) &
+              "# Data set ", i, trim(adjustl(data(i)%file)), &
+              " N = ", data(i)%n, &
+              ", Range = [", data(i)%xmin, ",", data(i)%xmax, "]"
     end if
-    if ( ndata > 20 ) then
+    if ( ndata > nomit ) then
       if ( i <= 5 .or. i > ndata - 5 ) then
         write(*,"(a,a,a,i8)") "# Number of data points in file: ", &
                               trim(adjustl(data(i)%file)), ": ", data(i)%n
@@ -181,23 +195,32 @@ program data_average
   do i = 1, nint
     xint = xmin + step*(i-1)
     average(i) = 0.d0
+    nj = 0
     do j = 1, ndata
-      data(j)%yint(i) = interpolate(data(j)%n,data(j)%x,data(j)%y,xint) 
-      average(i) = average(i) + data(j)%yint(i)
+      if ( xint >= data(j)%xmin .and. xint <= data(j)%xmax ) then
+        data(j)%yint(i) = interpolate(data(j)%n,data(j)%x,data(j)%y,xint) 
+        average(i) = average(i) + data(j)%yint(i)
+        nj = nj + 1
+      end if
     end do
-    average(i) = average(i) / ndata
+    average(i) = average(i) / nj
   end do
   
   ! Computing standard devation, and printing output
 
+  write(*,"('#            X     Average Y            SD    SD/sqrt(N)')")
   do i = 1, nint
     xint = xmin + step*(i-1)
     sd = 0.d0
+    nj = 0
     do j = 1, ndata
-      sd = sd + (data(j)%yint(i)-average(i))**2
+      if ( xint >= data(j)%xmin .and. xint <= data(j)%xmax ) then
+        sd = sd + (data(j)%yint(i)-average(i))**2
+        nj = nj + 1
+      end if
     end do
-    sd = dsqrt(sd/(ndata-1))
-    write(*,"(3(tr2,f12.5))") xint, average(i), sd
+    sd = dsqrt(sd/(nj-1))
+    write(*,"(4(tr2,f12.5))") xint, average(i), sd, sd/dsqrt(dble(nj))
   end do
   
 end program data_average
