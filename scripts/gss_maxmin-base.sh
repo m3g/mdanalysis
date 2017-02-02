@@ -10,7 +10,7 @@
 #
 #  L. Martinez, Institut Pasteur, Apr 22, 2008.
 #
-#  Version 17.020
+#  Version 17.033
 #
 # IMPORTANT:
 # Path for gss_maxmin program:
