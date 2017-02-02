@@ -48,7 +48,7 @@ program g_solute_solvent
   implicit none
   real, parameter :: pi = 4.d0*atan(1.e0)
   integer, parameter :: memory=15000000
-  integer :: maxatom 
+  integer :: maxatom
   integer :: natom, nsolute, nsolvent, isolute, isolvent, isolvent_random, &
              narg, length, firstframe, lastframe, stride, nclass,&
              nframes, dummyi, i, ntotat, memframes, ncycles, memlast,&
@@ -58,6 +58,8 @@ program g_solute_solvent
              nsmalld, & 
              frames
   integer :: nrsolvent_random, natsolvent_random
+  integer :: maxsmalld
+  logical :: memerror
   real :: dbulk, density_fix
   integer :: nbulk, ibulk, nintegral
   real :: site_sum, convert, solute_volume
@@ -437,8 +439,9 @@ program g_solute_solvent
 
   ! This is for the initialization of the smalldistances routine
 
-  allocate( ismalld(nsolute*(2*nsolvent)), dsmalld(nsolute*(2*nsolvent)), mind(2*nrsolvent), &
-            imind(nrsolvent) )
+  maxsmalld = nrsolvent
+  allocate( ismalld(maxsmalld), dsmalld(maxsmalld), &
+            mind(2*nrsolvent), imind(nrsolvent) )
   maxatom = 2*natom
   allocate( x(maxatom), y(maxatom), z(maxatom) )
 
@@ -613,8 +616,17 @@ program g_solute_solvent
 
       ! Compute all distances that are smaller than the cutoff
 
-      call smalldistances(nsolute,solute,nsolvent,solvent,x,y,z,cutoff,&
-                          nsmalld,ismalld,dsmalld,axis)
+      memerror = .true.
+      do while ( memerror ) 
+        memerror = .false.
+        call smalldistances(nsolute,solute,nsolvent,solvent,x,y,z,cutoff,&
+                            nsmalld,ismalld,dsmalld,axis,maxsmalld,memerror)
+        if ( memerror ) then
+          deallocate( ismalld, dsmalld )
+          maxsmalld = int(1.5*nsmalld)
+          allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
+        end if
+      end do
 
       !
       ! Computing the gss functions from distance data
@@ -774,8 +786,17 @@ program g_solute_solvent
       ! The solute atom was already added to the xyz array for computing volumes, so now
       ! we have only to compute the distances
 
-      call smalldistances(nsolute,solute2,natsolvent_random,solvent_random,x,y,z,cutoff,&
-                          nsmalld,ismalld,dsmalld,axis)
+      memerror = .true.
+      do while ( memerror ) 
+        memerror = .false.
+        call smalldistances(nsolute,solute,nsolvent,solvent,x,y,z,cutoff,&
+                            nsmalld,ismalld,dsmalld,axis,maxsmalld,memerror)
+        if ( memerror ) then
+          deallocate( ismalld, dsmalld )
+          maxsmalld = int(1.5*nsmalld)
+          allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
+        end if
+      end do
 
       ! Up to now, we are only interested in the site count in the bulk region, as set
       ! by the user 

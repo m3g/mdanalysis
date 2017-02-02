@@ -23,23 +23,31 @@
 !    
 !
 
-module linkedcells_smalldistances 
+module smalldistances_linkedcells
+
   integer, allocatable :: iatomfirst(:,:,:), iatomnext(:)
   integer :: nboxes(3)
   real :: cutoff2, axis(3)
-end module linkedcells_smalldistances
+
+end module smalldistances_linkedcells
 
 subroutine smalldistances(ngroup1,group1,ngroup2,group2,x,y,z,cutoff,&
-                          nsmalld,ismalld,dsmalld,axisin)
+                          nsmalld,ismalld,dsmalld,axisin,maxsmalld,memerror)
 
-  use linkedcells_smalldistances
+  use smalldistances_linkedcells
   implicit none
-  integer :: i, j, k, ngroup1, ngroup2, nsmalld, ibox, jbox, kbox, igroup1,&
-             ismalld(*), ii
+  integer :: i, j, k, ngroup1, ngroup2, nsmalld, ibox, jbox, kbox, igroup1, ii
   integer, allocatable :: group1_box(:,:)
   integer :: group1(*), group2(*), nbdim(3)
-  real :: x(*), y(*), z(*), x1, y1, z1, axisin(3), dsmalld(*)
+  real :: x(*), y(*), z(*), x1, y1, z1, axisin(3)
   real :: cutoff, xmin(3), xmax(3), boxlength, dbox_x, dbox_y, dbox_z
+
+  ! Large arrays
+
+  logical :: memerror
+  integer :: maxsmalld
+  integer :: ismalld(*)
+  real :: dsmalld(*)
 
   ! Get the axis of the periodic cell 
 
@@ -168,46 +176,46 @@ subroutine smalldistances(ngroup1,group1,ngroup2,group2,x,y,z,cutoff,&
   
     ! Inside box
   
-    call smalldcell(x,y,z,ii,group2,i,j,k,nsmalld,ismalld,dsmalld)
+    call smalldcell(x,y,z,ii,group2,i,j,k,nsmalld,ismalld,dsmalld,maxsmalld,memerror)
   
     ! Interactions of boxes that share faces
   
-    call smalldcell(x,y,z,ii,group2,i+1,j,k,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i,j+1,k,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i,j,k+1,nsmalld,ismalld,dsmalld) 
+    call smalldcell(x,y,z,ii,group2,i+1,j,k,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i,j+1,k,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i,j,k+1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
   
-    call smalldcell(x,y,z,ii,group2,i-1,j,k,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i,j-1,k,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i,j,k-1,nsmalld,ismalld,dsmalld) 
+    call smalldcell(x,y,z,ii,group2,i-1,j,k,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i,j-1,k,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i,j,k-1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
   
     ! Interactions of boxes that share axes
   
-    call smalldcell(x,y,z,ii,group2,i+1,j+1,k,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i+1,j,k+1,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i+1,j-1,k,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i+1,j,k-1,nsmalld,ismalld,dsmalld) 
+    call smalldcell(x,y,z,ii,group2,i+1,j+1,k,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i+1,j,k+1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i+1,j-1,k,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i+1,j,k-1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
   
-    call smalldcell(x,y,z,ii,group2,i,j+1,k+1,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i,j+1,k-1,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i,j-1,k+1,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i,j-1,k-1,nsmalld,ismalld,dsmalld) 
+    call smalldcell(x,y,z,ii,group2,i,j+1,k+1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i,j+1,k-1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i,j-1,k+1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i,j-1,k-1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
   
-    call smalldcell(x,y,z,ii,group2,i-1,j+1,k,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i-1,j,k+1,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i-1,j-1,k,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i-1,j,k-1,nsmalld,ismalld,dsmalld) 
+    call smalldcell(x,y,z,ii,group2,i-1,j+1,k,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i-1,j,k+1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i-1,j-1,k,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i-1,j,k-1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
   
     ! Interactions of boxes that share vertices
   
-    call smalldcell(x,y,z,ii,group2,i+1,j+1,k+1,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i+1,j+1,k-1,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i+1,j-1,k+1,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i+1,j-1,k-1,nsmalld,ismalld,dsmalld) 
+    call smalldcell(x,y,z,ii,group2,i+1,j+1,k+1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i+1,j+1,k-1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i+1,j-1,k+1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i+1,j-1,k-1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
   
-    call smalldcell(x,y,z,ii,group2,i-1,j+1,k+1,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i-1,j+1,k-1,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i-1,j-1,k+1,nsmalld,ismalld,dsmalld) 
-    call smalldcell(x,y,z,ii,group2,i-1,j-1,k-1,nsmalld,ismalld,dsmalld) 
+    call smalldcell(x,y,z,ii,group2,i-1,j+1,k+1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i-1,j+1,k-1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i-1,j-1,k+1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
+    call smalldcell(x,y,z,ii,group2,i-1,j-1,k-1,nsmalld,ismalld,dsmalld,maxsmalld,memerror) 
 
   end do
   deallocate( iatomfirst, iatomnext, group1_box )
@@ -221,13 +229,20 @@ end subroutine smalldistances
 !
 
 subroutine smalldcell(x,y,z,ii,group2,ibox,jbox,kbox,&
-                      nsmalld,ismalld,dsmalld)  
+                      nsmalld,ismalld,dsmalld,maxsmalld,memerror)  
 
-   use linkedcells_smalldistances          
+   use smalldistances_linkedcells
    implicit none
-   real :: d2, x1, y1, z1, dsmalld(*), x(*), y(*), z(*)
-   integer :: nsmalld, ii, igroup2, ismalld(*), ibox, jbox, kbox,&
+   real :: d2, x1, y1, z1, x(*), y(*), z(*)
+   integer :: nsmalld, ii, igroup2, ibox, jbox, kbox,&
               group2(*), jj
+
+   ! For large arrays
+  
+   logical :: memerror
+   integer :: maxsmalld
+   integer :: ismalld(*)
+   real :: dsmalld(*)
 
    igroup2 = iatomfirst(ibox,jbox,kbox)
    do while( igroup2 /= 0 )
@@ -246,8 +261,12 @@ subroutine smalldcell(x,y,z,ii,group2,ibox,jbox,kbox,&
 
      if ( d2 < cutoff2 ) then
        nsmalld = nsmalld + 1
-       ismalld(nsmalld) = igroup2
-       dsmalld(nsmalld) = sqrt(d2)
+       if ( nsmalld > maxsmalld ) then
+         memerror = .true.
+       else
+         ismalld(nsmalld) = igroup2
+         dsmalld(nsmalld) = sqrt(d2)
+       end if
      end if
 
      igroup2 = iatomnext(igroup2)
