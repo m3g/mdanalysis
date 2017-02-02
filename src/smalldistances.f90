@@ -13,6 +13,7 @@
 !    x,y,z: Coordinates of the atoms x(group1(1)), for example, is the first atom of group1
 !    cutoff: The maximum distance to be considered
 !    axisin: vector of dimension 3 containing the size of the periodic box in each dimension
+!    maxsmalld: The estimated maximum number of distances that will be computed (see memerror)
 !
 ! On output:
 !    nsmalld: Number of distances between atoms of group1 and group1 which are smaller than 'cutoff'
@@ -20,7 +21,12 @@
 !             Note that the indexes in ismalld go from 1 to ngroup2, for the atoms of group2
 !    dsmalld: The actual distance of atom of group2 to some atom of group1 (here we do not care
 !             about the identity of the solute atom).
-!    
+!
+!    memerror: On output, it is true if the number of distances computed is greater than
+!              maxsmalld. The number of distances will be stored in nsmalld, but ismalld and
+!              dsmalld will not contain relevant data. If memerror is true, these two
+!              vectors must be reallocated with at least "nsmalld" positions and the 
+!              routine should be called again. 
 !
 
 module smalldistances_linkedcells
