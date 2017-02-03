@@ -789,7 +789,7 @@ program g_solute_solvent
       memerror = .true.
       do while ( memerror ) 
         memerror = .false.
-        call smalldistances(nsolute,solute,nsolvent,solvent,x,y,z,cutoff,&
+        call smalldistances(nsolute,solute2,natsolvent_random,solvent_random,x,y,z,cutoff,&
                             nsmalld,ismalld,dsmalld,axis,maxsmalld,memerror)
         if ( memerror ) then
           deallocate( ismalld, dsmalld )
