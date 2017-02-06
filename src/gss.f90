@@ -990,7 +990,7 @@ program g_solute_solvent
       if ( gss_atom_contribution_random(j,i) > 0.e0 ) then
         gamma_atom(j,i) = gss_atom_contribution(j,i)/gss_atom_contribution_random(j,i)
       else
-        gamma_atom(j,i) = 0.e0
+        gamma_atom(j,i) = 1.e0
       end if
       if ( gss_atom(j,i) > 0.e0 ) then
         phi_atom(j,i) = gamma_atom(j,i)/gss_atom(j,i)
