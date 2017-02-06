@@ -45,12 +45,13 @@ program g_solute_solvent
  
   ! Static variables
 
+  use file_operations
   implicit none
   real, parameter :: pi = 4.d0*atan(1.e0)
   integer, parameter :: memory=15000000
   integer :: maxatom
   integer :: natom, nsolute, nsolvent, isolute, isolvent, isolvent_random, &
-             narg, length, firstframe, lastframe, stride, nclass,&
+             narg, firstframe, lastframe, stride, nclass,&
              nframes, dummyi, i, ntotat, memframes, ncycles, memlast,&
              j, iframe, icycle, nfrcycle, iatom, k, ii, &
              status, keystatus, iargc, lastatom, nres, nrsolute,&
@@ -74,7 +75,9 @@ program g_solute_solvent
   real :: bulkerror, sdbulkerror
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
-                        output, lineformat, gssperatom
+                        lineformat
+  character(len=200) :: output, &
+                        output_atom_gss, output_atom_gamma, output_atom_phi, output_atom_contrib
   character(len=4) :: dummyc
   logical :: readfromdcd, dcdaxis, periodic, onscreenprogress
   real :: shellradius, rshift
@@ -91,12 +94,35 @@ program g_solute_solvent
                           irsolv(:), ismalld(:), irsolv_random(:)
   integer, allocatable :: imind(:)
 
-  real, allocatable :: site_count_random(:)
-  real, allocatable :: site_count(:), shellvolume(:),&
-                       site_count_at_frame(:)
-  real, allocatable :: gss(:)
-  real, allocatable :: gss_per_atom(:,:)
+  ! Shell volume, estimated from atom count
+  real, allocatable :: shellvolume(:)
 
+  ! These are the global (whole-solvent-molecule) counts of minimum-distances
+  real, allocatable :: site_count(:)
+  real, allocatable :: site_count_random(:)
+
+  ! This is used only transiently for bulk volume estimate 
+  real, allocatable :: site_count_at_frame(:)
+
+  ! This is the resulting gss (site_count/site_count_random)
+  real, allocatable :: gss(:)
+
+  ! These are the counts to compute the gss per atom
+  real, allocatable :: site_count_atom(:,:)
+  real, allocatable :: site_count_atom_random(:,:)
+  real, allocatable :: gss_atom(:,:)
+
+  ! These are to compute the atomic contributions to the gss 
+  real, allocatable :: gss_atom_contribution(:,:)
+  real, allocatable :: gss_atom_contribution_random(:,:)
+
+  ! This is the orientational parameter phi per atom
+  real, allocatable :: phi_atom(:,:)
+
+  ! Final gamma parameter per atom (contribution to gss relative to contribution without solute)
+  real, allocatable :: gamma_atom(:,:)
+
+  ! Data read from the psf file, not necessarily used here
   real, allocatable :: eps(:), sig(:), q(:), e(:), s(:), mass(:),&
                        solvent_molecule(:,:), &
                        xref(:), yref(:), zref(:), xrnd(:), yrnd(:), zrnd(:),&
@@ -139,8 +165,7 @@ program g_solute_solvent
   ! Default output file names
 
   output = "gss.dat"
-  gssperatom = "gssperatom.dat"
-  
+
   ! Open input file and read parameters
   
   narg = iargc()
@@ -219,9 +244,6 @@ program g_solute_solvent
     else if(keyword(record) == 'output') then
       output = value(record)
       write(*,*) ' GSS output file name: ', output(1:length(output))
-    else if(keyword(record) == 'gssperatom') then
-      gssperatom = value(record)
-      write(*,*) ' GSS per-atom output file name: ', gssperatom(1:length(gssperatom))
     else if(keyword(record) == 'solute' .or. &
             keyword(record) == 'solvent') then
       write(*,"(a,/,a)") ' ERROR: The options solute and solvent must be used ',&
@@ -243,7 +265,14 @@ program g_solute_solvent
     write(*,*) ' ERROR: Could not read value for keyword: ',line(1:length(line))
     stop
   end if
+
+  ! Names of atomic output files
   
+  output_atom_gss = output(1:length(remove_extension(output)))//"-GSS_PERATOM."//file_extension(output)
+  output_atom_gamma = output(1:length(remove_extension(output)))//"-GAMMA_PERATOM."//file_extension(output)
+  output_atom_phi = output(1:length(remove_extension(output)))//"-PHI_PERATOM."//file_extension(output)
+  output_atom_contrib = output(1:length(remove_extension(output)))//"-GSS_PERATOM_CONTRIB."//file_extension(output)
+
   ! Reading the header of psf file
   
   call getdim(psffile,inputfile,natom)
@@ -473,8 +502,14 @@ program g_solute_solvent
   
   allocate( solvent_molecule(natoms_solvent,3), &
             xref(natoms_solvent), yref(natoms_solvent), zref(natoms_solvent),&
-            xrnd(natoms_solvent), yrnd(natoms_solvent), zrnd(natoms_solvent),& 
-            gss_per_atom(natoms_solvent,nbins) )
+            xrnd(natoms_solvent), yrnd(natoms_solvent), zrnd(natoms_solvent) )
+  allocate( gss_atom_contribution(natoms_solvent,nbins), &
+            gss_atom_contribution_random(natoms_solvent,nbins) )
+  allocate( site_count_atom(natoms_solvent,nbins), &
+            site_count_atom_random(natoms_solvent,nbins), &
+            gss_atom(natoms_solvent,nbins), &
+            phi_atom(natoms_solvent,nbins), &
+            gamma_atom(natoms_solvent,nbins) )
   
   ! Checking if dcd file contains periodic cell information
   
@@ -527,7 +562,10 @@ program g_solute_solvent
     site_count_random(i) = 0.e0
     shellvolume(i) = 0.e0
     do j = 1, natoms_solvent
-      gss_per_atom(j,i) = 0.e0
+      gss_atom_contribution(j,i) = 0.e0
+      gss_atom_contribution_random(j,i) = 0.e0
+      site_count_atom(j,i) = 0.e0
+      site_count_atom_random(j,i) = 0.e0
     end do
   end do
   bulkdensity = 0.e0
@@ -646,6 +684,10 @@ program g_solute_solvent
           if ( j == 0 ) j = natoms_solvent
           imind(isolvent) = j
         end if
+        j = mod(ismalld(i),natoms_solvent) 
+        if ( j == 0 ) j = natoms_solvent
+        irad = int(float(nbins)*dsmalld(i)/cutoff)+1
+        site_count_atom(j,irad) = site_count_atom(j,irad) + 1.e0
       end do
 
       ! Summing up current data to the gss histogram
@@ -659,7 +701,7 @@ program g_solute_solvent
           site_count(irad) = site_count(irad) + 1.e0
           site_count_at_frame(irad) = site_count_at_frame(irad) + 1.e0
           if ( imind(i) > 0 ) then
-            gss_per_atom(imind(i),irad) = gss_per_atom(imind(i),irad) + 1.e0
+            gss_atom_contribution(imind(i),irad) = gss_atom_contribution(imind(i),irad) + 1.e0
           end if
         end if
       end do
@@ -690,6 +732,13 @@ program g_solute_solvent
       ! be used for normalization
 
       nrsolvent_random = nintegral*nint(nrsolvent*totalvolume/(totalvolume-solute_volume))
+
+      ! Checking if imind is large enough
+
+      if ( size(imind) < nrsolvent_random ) then
+        deallocate(imind)
+        allocate(imind(nrsolvent_random))
+      end if
 
       !
       ! Using this large sampling of random solvent positions, we will compute the
@@ -803,11 +852,15 @@ program g_solute_solvent
 
       do i = 1, nrsolvent_random
         mind(i) = cutoff + 1.e0
+        imind(i) = 0
       end do
       do i = 1, nsmalld
         isolvent = irsolv_random(ismalld(i))
         if ( dsmalld(i) < mind(isolvent) ) then
           mind(isolvent) = dsmalld(i)
+          j = mod(ismalld(i),natoms_solvent) 
+          if ( j == 0 ) j = natoms_solvent
+          imind(isolvent) = j
         end if
       end do
       
@@ -853,7 +906,17 @@ program g_solute_solvent
         irad = int(float(nbins)*mind(i)/cutoff)+1
         if ( irad <= nbins ) then
           site_count_random(irad) = site_count_random(irad) + 1.e0*density_fix
+          if ( imind(i) > 0 ) then
+            gss_atom_contribution_random(imind(i),irad) = gss_atom_contribution_random(imind(i),irad) + 1.e0*density_fix
+          end if
         end if
+      end do
+      ! Accumulate site count for each atom
+      do i = 1, nsmalld
+        j = mod(ismalld(i),natoms_solvent) 
+        if ( j == 0 ) j = natoms_solvent
+        irad = int(float(nbins)*dsmalld(i)/cutoff)+1
+        site_count_atom_random(j,irad) = site_count_atom_random(j,irad) + 1.e0*density_fix
       end do
 
       ! Write progress
@@ -879,21 +942,63 @@ program g_solute_solvent
   bulkdensity = bulkdensity / frames
   simdensity = simdensity / frames
   do i = 1, nbins
+
+    ! GSS distributions
+
     site_count(i) = site_count(i)/frames
     site_count_random(i) = site_count_random(i)/frames
     shellvolume(i) = site_count_random(i)/bulkdensity
+
     if ( site_count_random(i) > 0.e0 ) then
       gss(i) = site_count(i)/site_count_random(i)
       do j = 1, natoms_solvent
-        gss_per_atom(j,i) = gss_per_atom(j,i)/frames  
-        gss_per_atom(j,i) = gss_per_atom(j,i)/site_count_random(i)
+        gss_atom_contribution(j,i) = gss_atom_contribution(j,i)/frames  
+        gss_atom_contribution(j,i) = gss_atom_contribution(j,i)/site_count_random(i)
       end do
     else
       gss(i) = 0.e0
       do j = 1, natoms_solvent
-        gss_per_atom(j,i) = 0.e0
+        gss_atom_contribution(j,i) = 0.e0
       end do
     end if
+
+    ! Additional distribution required for computing atomic parameters
+    
+    if ( site_count_random(i) > 0.e0 ) then
+      do j = 1, natoms_solvent
+        gss_atom_contribution_random(j,i) = gss_atom_contribution_random(j,i)/frames  
+        gss_atom_contribution_random(j,i) = gss_atom_contribution_random(j,i)/site_count_random(i)
+      end do
+    else
+      do j = 1, natoms_solvent
+        gss_atom_contribution_random(j,i) = 0.e0
+      end do
+    end if
+    do j = 1, natoms_solvent
+      site_count_atom(j,i) = site_count_atom(j,i) / frames
+      site_count_atom_random(j,i) = site_count_atom_random(j,i) / frames
+      if ( site_count_atom_random(j,i) > 0.e0 ) then
+        gss_atom(j,i) = site_count_atom(j,i) / site_count_atom_random(j,i)
+      else
+        gss_atom(j,i) = 0.e0
+      end if
+    end do
+
+    ! Final atomic distribution parameters
+
+    do j = 1, natoms_solvent
+      if ( gss_atom_contribution_random(j,i) > 0.e0 ) then
+        gamma_atom(j,i) = gss_atom_contribution(j,i)/gss_atom_contribution_random(j,i)
+      else
+        gamma_atom(j,i) = 0.e0
+      end if
+      if ( gss_atom(j,i) > 0.e0 ) then
+        phi_atom(j,i) = gamma_atom(j,i)/gss_atom(j,i)
+      else
+        phi_atom(j,i) = 1.d0
+      end if
+    end do
+
   end do
 
   write(*,*)
@@ -1014,8 +1119,8 @@ program g_solute_solvent
 
   ! Writting gss per atom contributions 
 
-  open(20,file=gssperatom)
-  write(20,"(a)") "# GSS contribution per atom. "
+  open(20,file=output_atom_contrib)
+  write(20,"(a)") "# Total GSS contribution per atom. "
   write(20,"( '#',/,&
              &'# Input file: ',a,/,& 
              &'# DCD file: ',a,/,& 
@@ -1031,7 +1136,76 @@ program g_solute_solvent
   write(20,lineformat) (i,i=1,natoms_solvent)
   write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
   do i = 1, nbins
-    write(20,lineformat) shellradius(i,binstep), gss(i), (gss_per_atom(j,i),j=1,natoms_solvent)
+    write(20,lineformat) shellradius(i,binstep), gss(i), (gss_atom_contribution(j,i),j=1,natoms_solvent)
+  end do
+  close(20)
+
+  ! Writting independent atomic GSSs
+
+  open(20,file=output_atom_gss)
+  write(20,"(a)") "# Indepdendent GSS for each atom "
+  write(20,"( '#',/,&
+             &'# Input file: ',a,/,& 
+             &'# DCD file: ',a,/,& 
+             &'# Group file: ',a,/,&
+             &'# PSF file: ' )")
+  write(20,"(a)") "#"
+  write(20,"(a)") "# Atoms: "
+  do i = 1, natoms_solvent
+    write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solvent(i)), classat(solvent(i)), mass(solvent(i))
+  end do
+  write(20,"(a)") "#"
+  write(lineformat,*) "('#',t7,'DISTANCE     GSS TOTAL',",natoms_solvent,"(tr2,i12) )"
+  write(20,lineformat) (i,i=1,natoms_solvent)
+  write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
+  do i = 1, nbins
+    write(20,lineformat) shellradius(i,binstep), gss(i), (gss_atom(j,i),j=1,natoms_solvent)
+  end do
+  close(20)
+
+  ! Writting atomic gamma parameters
+
+  open(20,file=output_atom_gamma)
+  write(20,"(a)") "# Atomic gss gamma parameters "
+  write(20,"( '#',/,&
+             &'# Input file: ',a,/,& 
+             &'# DCD file: ',a,/,& 
+             &'# Group file: ',a,/,&
+             &'# PSF file: ' )")
+  write(20,"(a)") "#"
+  write(20,"(a)") "# Atoms: "
+  do i = 1, natoms_solvent
+    write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solvent(i)), classat(solvent(i)), mass(solvent(i))
+  end do
+  write(20,"(a)") "#"
+  write(lineformat,*) "('#',t7,'DISTANCE     GSS TOTAL',",natoms_solvent,"(tr2,i12) )"
+  write(20,lineformat) (i,i=1,natoms_solvent)
+  write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
+  do i = 1, nbins
+    write(20,lineformat) shellradius(i,binstep), gss(i), (gamma_atom(j,i),j=1,natoms_solvent)
+  end do
+  close(20)
+
+  ! Writting orientational PHI parameter
+
+  open(20,file=output_atom_phi)
+  write(20,"(a)") "# Indepdendent GSS for each atom "
+  write(20,"( '#',/,&
+             &'# Input file: ',a,/,& 
+             &'# DCD file: ',a,/,& 
+             &'# Group file: ',a,/,&
+             &'# PSF file: ' )")
+  write(20,"(a)") "#"
+  write(20,"(a)") "# Atoms: "
+  do i = 1, natoms_solvent
+    write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solvent(i)), classat(solvent(i)), mass(solvent(i))
+  end do
+  write(20,"(a)") "#"
+  write(lineformat,*) "('#',t7,'DISTANCE     GSS TOTAL',",natoms_solvent,"(tr2,i12) )"
+  write(20,lineformat) (i,i=1,natoms_solvent)
+  write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
+  do i = 1, nbins
+    write(20,lineformat) shellradius(i,binstep), gss(i), (phi_atom(j,i),j=1,natoms_solvent)
   end do
   close(20)
 
@@ -1044,7 +1218,11 @@ program g_solute_solvent
   write(*,*) ' OUTPUT FILES: ' 
   write(*,*)
   write(*,*) ' Wrote GSS output file: ', trim(adjustl(output))
-  write(*,*) ' Wrote GSS per atom output file: ', trim(adjustl(gssperatom))
+  write(*,*) ' Wrote atomic GSS to file: ', trim(adjustl(output_atom_gss)) 
+  write(*,*) ' Wrote atomic gamma to file: ', trim(adjustl(output_atom_gamma))
+  write(*,*) ' Wrote atomic phi to file: ', trim(adjustl(output_atom_phi))
+  write(*,*) ' Wrote atomic contributions to file: ', trim(adjustl(output_atom_contrib))
+  write(*,*) ' Wrote GSS output file: ', trim(adjustl(output))
   write(*,*)
   write(*,*) ' Which contains the volume-normalized and'
   write(*,*) ' unnormalized gss functions. '
