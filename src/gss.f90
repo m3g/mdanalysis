@@ -126,7 +126,8 @@ program g_solute_solvent
   real, allocatable :: eps(:), sig(:), q(:), e(:), s(:), mass(:),&
                        solvent_molecule(:,:), &
                        xref(:), yref(:), zref(:), xrnd(:), yrnd(:), zrnd(:),&
-                       x(:), y(:), z(:), mind(:), dsmalld(:)
+                       x(:), y(:), z(:), dsmalld(:)
+  real, allocatable :: mind_mol(:), mind_atom(:)
   character(len=6), allocatable :: class(:), segat(:), resat(:),&
                                    typeat(:), classat(:)
   
@@ -469,10 +470,10 @@ program g_solute_solvent
   ! This is for the initialization of the smalldistances routine
 
   maxsmalld = nrsolvent
-  allocate( ismalld(maxsmalld), dsmalld(maxsmalld), &
-            mind(2*nrsolvent), imind(nrsolvent) )
+  allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
   maxatom = 2*natom
   allocate( x(maxatom), y(maxatom), z(maxatom) )
+  allocate( imind(nrsolvent), mind_mol(nrsolvent), mind_atom(nsolvent) )
 
   ! Output some group properties for testing purposes
   
@@ -673,21 +674,25 @@ program g_solute_solvent
       ! For each solvent residue, get the MINIMUM distance to the solute
     
       do i = 1, nrsolvent
-        mind(i) = cutoff + 1.e0
+        mind_mol(i) = cutoff + 1.e0
         imind(i) = 0
       end do
+      do i = 1, nsolvent
+        mind_atom(i) = cutoff + 1.e0
+      end do
       do i = 1, nsmalld
+        ! Counting for computing the whole-molecule gss 
         isolvent = irsolv(ismalld(i))
-        if ( dsmalld(i) < mind(isolvent) ) then
-          mind(isolvent) = dsmalld(i)
+        if ( dsmalld(i) < mind_mol(isolvent) ) then
+          mind_mol(isolvent) = dsmalld(i)
           j = mod(ismalld(i),natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
           imind(isolvent) = j
         end if
-        j = mod(ismalld(i),natoms_solvent) 
-        if ( j == 0 ) j = natoms_solvent
-        irad = int(float(nbins)*dsmalld(i)/cutoff)+1
-        site_count_atom(j,irad) = site_count_atom(j,irad) + 1.e0
+        ! Counting for computing atom-specific gss
+        if ( dsmalld(i) < mind_atom(ismalld(i)) ) then
+          mind_atom(ismalld(i)) = dsmalld(i)
+        end if
       end do
 
       ! Summing up current data to the gss histogram
@@ -696,13 +701,21 @@ program g_solute_solvent
         site_count_at_frame(i) = 0.e0
       end do
       do i = 1, nrsolvent
-        irad = int(float(nbins)*mind(i)/cutoff)+1
+        irad = int(float(nbins)*mind_mol(i)/cutoff)+1
         if( irad <= nbins ) then
           site_count(irad) = site_count(irad) + 1.e0
           site_count_at_frame(irad) = site_count_at_frame(irad) + 1.e0
           if ( imind(i) > 0 ) then
             gss_atom_contribution(imind(i),irad) = gss_atom_contribution(imind(i),irad) + 1.e0
           end if
+        end if
+      end do
+      do i = 1, nsolvent
+        irad = int(float(nbins)*mind_atom(i)/cutoff)+1
+        if( irad <= nbins ) then
+          j = mod(i,natoms_solvent) 
+          if ( j == 0 ) j = natoms_solvent
+          site_count_atom(j,irad) = site_count_atom(j,irad) + 1.e0
         end if
       end do
 
@@ -752,24 +765,32 @@ program g_solute_solvent
 
       ! Checking the size of the arrays and updating if necessary
 
-      if ( natsolvent_random > size( solvent_random ) ) then
+      if ( size(mind_atom) < natsolvent_random ) then
+        deallocate( mind_atom )
+        allocate( mind_atom(nrsolvent_random*natoms_solvent) )
+      end if
+      if ( size(solvent_random) < natsolvent_random ) then
         deallocate( solvent_random, irsolv_random ) 
         allocate( solvent_random(natsolvent_random), irsolv_random(natsolvent_random) )
       end if
-      if ( nsolute+natsolvent_random > size(x) ) then
+      if ( size(x) < nsolute+natsolvent_random ) then
         deallocate( x, y, z )
         allocate( x(nsolute+natsolvent_random), &
                   y(nsolute+natsolvent_random), &
                   z(nsolute+natsolvent_random) )
       end if
-      if ( natsolvent_random*nsolute > size(dsmalld) ) then
+      if ( size(dsmalld) < natsolvent_random*nsolute ) then
         deallocate( dsmalld, ismalld ) 
         allocate( dsmalld(natsolvent_random*nsolute), ismalld(natsolvent_random*nsolute) )
       end if
-      if ( nrsolvent_random > size(mind) ) then
-        deallocate( mind )
-        allocate( mind(nrsolvent_random) )
+      if ( size(mind_mol) < nrsolvent_random ) then
+        deallocate( mind_mol )
+        allocate( mind_mol(nrsolvent_random) )
       end if
+
+      !
+      ! Generating random distribution of solvent molecules in box
+      !
 
       do isolvent_random = 1, nrsolvent_random
 
@@ -851,13 +872,13 @@ program g_solute_solvent
       ! by the user 
 
       do i = 1, nrsolvent_random
-        mind(i) = cutoff + 1.e0
+        mind_mol(i) = cutoff + 1.e0
         imind(i) = 0
       end do
       do i = 1, nsmalld
         isolvent = irsolv_random(ismalld(i))
-        if ( dsmalld(i) < mind(isolvent) ) then
-          mind(isolvent) = dsmalld(i)
+        if ( dsmalld(i) < mind_mol(isolvent) ) then
+          mind_mol(isolvent) = dsmalld(i)
           j = mod(ismalld(i),natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
           imind(isolvent) = j
@@ -868,7 +889,7 @@ program g_solute_solvent
 
       nbulk = 0
       do i = 1, nrsolvent_random
-        if ( mind(i) >= dbulk .and. mind(i) <= cutoff ) then
+        if ( mind_mol(i) >= dbulk .and. mind_mol(i) <= cutoff ) then
           nbulk = nbulk + 1
         end if
       end do
@@ -903,7 +924,7 @@ program g_solute_solvent
       ! rescaled for the correct density
 
       do i = 1, nrsolvent_random
-        irad = int(float(nbins)*mind(i)/cutoff)+1
+        irad = int(float(nbins)*mind_mol(i)/cutoff)+1
         if ( irad <= nbins ) then
           site_count_random(irad) = site_count_random(irad) + 1.e0*density_fix
           if ( imind(i) > 0 ) then
@@ -911,12 +932,24 @@ program g_solute_solvent
           end if
         end if
       end do
+
       ! Accumulate site count for each atom
+
+      do i = 1, natsolvent_random
+        mind_atom(i) = cutoff + 1.e0
+      end do
       do i = 1, nsmalld
-        j = mod(ismalld(i),natoms_solvent) 
-        if ( j == 0 ) j = natoms_solvent
-        irad = int(float(nbins)*dsmalld(i)/cutoff)+1
-        site_count_atom_random(j,irad) = site_count_atom_random(j,irad) + 1.e0*density_fix
+        if ( dsmalld(i) < mind_atom(ismalld(i)) ) then
+          mind_atom(ismalld(i)) = dsmalld(i)
+        end if
+      end do
+      do i = 1, natsolvent_random
+        irad = int(float(nbins)*mind_atom(i)/cutoff)+1
+        if ( irad <= nbins ) then
+          j = mod(i,natoms_solvent) 
+          if ( j == 0 ) j = natoms_solvent
+          site_count_atom_random(j,irad) = site_count_atom_random(j,irad) + 1.e0*density_fix
+        end if
       end do
 
       ! Write progress
