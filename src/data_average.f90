@@ -23,9 +23,9 @@ program data_average
   integer :: narg, iargc, ioerr
   integer :: i, j, k, nomit
   integer :: ndata, xcol, ycol, nint, nj
-  double precision :: xmin, xmax, step, xread, yread, xlast, xint
+  double precision :: xmin, xmax, step, xread, yread, xlast, xint, ytemp, median
   double precision :: interpolate, sd
-  double precision, allocatable :: average(:)
+  double precision, allocatable :: average(:), ysort(:)
   character(len=200) :: record, record2, lineformat
   type(data_type), allocatable :: data(:)
 
@@ -142,6 +142,7 @@ program data_average
 
   end do
 
+  write(*,"(a,i8)") "# Number of data sets: ", ndata
   write(*,"(a,f12.5)") "# Minimum x value: ", xmin
   write(*,"(a,f12.5)") "# Maximum x value: ", xmax
   write(*,"(a,f12.5)") "# Minimum step in x: ", step
@@ -208,11 +209,34 @@ program data_average
   
   ! Computing standard devation, and printing output
 
-  write(*,"('#            X     Average Y            SD    SD/sqrt(N)')")
+  allocate(ysort(nint))
+  write(*,"('#            X     Average Y            SD    SD/sqrt(N)        Median')")
   do i = 1, nint
     xint = xmin + step*(i-1)
     sd = 0.d0
     nj = 0
+
+    ! Compute median
+
+    do j = 1, ndata
+      ysort(j) = data(j)%yint(i)
+    end do
+    do k = 1, ndata-1
+      j = k + 1
+      do while( ysort(j-1) < ysort(j) )
+        ytemp = ysort(j-1)
+        ysort(j-1) = ysort(j) 
+        ysort(j) = ytemp
+        j = j - 1
+        if ( j == 1 ) exit
+      end do
+    end do
+    if ( mod(ndata,2) == 0 ) then
+      median = 0.5d0*(ysort(ndata/2) + ysort(ndata/2+1))
+    else
+      median = ysort(ndata/2+1)
+    end if
+    
     do j = 1, ndata
       if ( xint >= data(j)%xmin .and. xint <= data(j)%xmax ) then
         sd = sd + (data(j)%yint(i)-average(i))**2
@@ -220,7 +244,7 @@ program data_average
       end if
     end do
     sd = dsqrt(sd/(nj-1))
-    write(*,"(4(tr2,f12.5))") xint, average(i), sd, sd/dsqrt(dble(nj))
+    write(*,"(5(tr2,f12.5))") xint, average(i), sd, sd/dsqrt(dble(nj)), median
   end do
   
 end program data_average
