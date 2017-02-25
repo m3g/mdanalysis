@@ -896,6 +896,9 @@ program g_solute_solvent
 
       ! The minimum-distance volume of the bulk is, then...
 
+!voltar
+write(*,*) nbulk, nrsolvent_random, totalvolume
+stop
       bulkvolume = (float(nbulk)/nrsolvent_random)*totalvolume 
 
       ! Therefore, since we have already computed the gss at these distances,
