@@ -41,7 +41,7 @@
 ! Institute of Chemistry, State University of Campinas (UNICAMP)
 !
 
-program g_solute_solvent
+program g_minimum_distance
  
   ! Static variables
 
@@ -50,7 +50,7 @@ program g_solute_solvent
   real, parameter :: pi = 4.d0*atan(1.e0)
   integer, parameter :: memory=15000000
   integer :: maxatom
-  integer :: natom, nsolute, nsolvent, isolute, isolvent, isolvent_random, &
+  integer :: natom, nsolute, nsolvent, isolute, isolvent, &
              narg, firstframe, lastframe, stride, nclass,&
              nframes, dummyi, i, ntotat, memframes, ncycles, memlast,&
              j, iframe, icycle, nfrcycle, iatom, k, ii, &
@@ -58,12 +58,12 @@ program g_solute_solvent
              nrsolvent, kframe, irad, nbins, natoms_solvent,&
              nsmalld, & 
              frames
-  integer :: nrsolvent_random, natsolvent_random
+  integer :: nrandom
   integer :: maxsmalld
   logical :: memerror
-  real :: dbulk, density_fix
-  integer :: nbulk, ibulk, nintegral
-  real :: site_sum, convert, solute_volume
+  real :: dbulk
+  integer :: ibulk, nintegral
+  real :: site_sum, convert
   double precision :: readsidesx, readsidesy, readsidesz, t
   real :: side(memory,3), mass1, mass2, random, axis(3)
   real, parameter :: mole = 6.022140857e23
@@ -74,28 +74,25 @@ program g_solute_solvent
   real :: bulkdensity, totalvolume, bulkvolume, simdensity, solutevolume
   real :: bulkerror, sdbulkerror
   character(len=200) :: groupfile, line, record, value, keyword,&
-                        dcdfile, inputfile, psffile, file,&
+                        dcdfile, inputfile, psffile, &
                         lineformat
   character(len=200) :: output, &
-                        output_atom_gss, output_atom_gamma, output_atom_phi, output_atom_contrib
+                        output_atom_gmd, output_atom_gamma, output_atom_phi, output_atom_contrib
   character(len=4) :: dummyc
   logical :: readfromdcd, dcdaxis, periodic, onscreenprogress
   real :: shellradius, rshift
   real :: sphericalshellvolume, sphereradiusfromshellvolume
 
-  integer :: jj
-  real :: beta, gamma, theta, cmx, cmy, cmz
-
   ! Allocatable arrays
   
-  integer, allocatable :: solute2(:), solvent_random(:)
+  integer, allocatable :: index_solute(:), index_random(:)
   integer, allocatable :: solute(:), solvent(:), resid(:), &
                           natres(:), fatres(:), fatrsolute(:), fatrsolvent(:), &
-                          irsolv(:), ismalld(:), irsolv_random(:)
+                          irsolv(:), ismalld(:)
   integer, allocatable :: imind(:)
 
   ! Shell volume, estimated from atom count
-  real, allocatable :: shellvolume(:)
+  real, allocatable :: shellvolume(:), shellvolume_at_frame(:)
 
   ! These are the global (whole-solvent-molecule) counts of minimum-distances
   real, allocatable :: site_count(:)
@@ -104,28 +101,18 @@ program g_solute_solvent
   ! This is used only transiently for bulk volume estimate 
   real, allocatable :: site_count_at_frame(:)
 
-  ! This is the resulting gss (site_count/site_count_random)
-  real, allocatable :: gss(:)
+  ! This is the resulting gmd (site_count/site_count_random)
+  real, allocatable :: gmd(:)
 
-  ! These are the counts to compute the gss per atom
+  ! These are the counts to compute the gmd per atom
   real, allocatable :: site_count_atom(:,:)
-  real, allocatable :: site_count_atom_random(:,:)
-  real, allocatable :: gss_atom(:,:)
+  real, allocatable :: gmd_atom(:,:)
 
-  ! These are to compute the atomic contributions to the gss 
-  real, allocatable :: gss_atom_contribution(:,:)
-  real, allocatable :: gss_atom_contribution_random(:,:)
-
-  ! This is the orientational parameter phi per atom
-  real, allocatable :: phi_atom(:,:)
-
-  ! Final gamma parameter per atom (contribution to gss relative to contribution without solute)
-  real, allocatable :: gamma_atom(:,:)
+  ! These are to compute the atomic contributions to the gmd 
+  real, allocatable :: gmd_atom_contribution(:,:)
 
   ! Data read from the psf file, not necessarily used here
   real, allocatable :: eps(:), sig(:), q(:), e(:), s(:), mass(:),&
-                       solvent_molecule(:,:), &
-                       xref(:), yref(:), zref(:), xrnd(:), yrnd(:), zrnd(:),&
                        x(:), y(:), z(:), dsmalld(:)
   real, allocatable :: mind_mol(:), mind_atom(:)
   character(len=6), allocatable :: class(:), segat(:), resat(:),&
@@ -139,7 +126,7 @@ program g_solute_solvent
   
   write(*,"(/,' ####################################################',&
             &/,/,&
-            & '   GSS: Compute gss distribution from DCD files      ',&
+            & '   GMD: Compute gmd distribution from DCD files      ',&
             &/,/,&
             & ' ####################################################',/)")    
   
@@ -165,13 +152,13 @@ program g_solute_solvent
 
   ! Default output file names
 
-  output = "gss.dat"
+  output = "gmd.dat"
 
   ! Open input file and read parameters
   
   narg = iargc()
   if(narg == 0) then
-    write(*,*) ' Run with: ./gss input.inp '
+    write(*,*) ' Run with: ./gmd input.inp '
     stop
   end if   
   call getarg(1,record)
@@ -244,11 +231,11 @@ program g_solute_solvent
       end if 
     else if(keyword(record) == 'output') then
       output = value(record)
-      write(*,*) ' GSS output file name: ', output(1:length(output))
+      write(*,*) ' GMD output file name: ', output(1:length(output))
     else if(keyword(record) == 'solute' .or. &
             keyword(record) == 'solvent') then
       write(*,"(a,/,a)") ' ERROR: The options solute and solvent must be used ',&
-                         '        with the gss.sh script, not directly. '
+                         '        with the gmd.sh script, not directly. '
       stop
     else if(record(1:1) /= '#' .and. & 
             keyword(record) /= 'par' .and. &
@@ -269,10 +256,10 @@ program g_solute_solvent
 
   ! Names of atomic output files
   
-  output_atom_gss = output(1:length(remove_extension(output)))//"-GSS_PERATOM."//file_extension(output)
+  output_atom_gmd = output(1:length(remove_extension(output)))//"-GMD_PERATOM."//file_extension(output)
   output_atom_gamma = output(1:length(remove_extension(output)))//"-GAMMA_PERATOM."//file_extension(output)
   output_atom_phi = output(1:length(remove_extension(output)))//"-PHI_PERATOM."//file_extension(output)
-  output_atom_contrib = output(1:length(remove_extension(output)))//"-GSS_PERATOM_CONTRIB."//file_extension(output)
+  output_atom_contrib = output(1:length(remove_extension(output)))//"-GMD_PERATOM_CONTRIB."//file_extension(output)
 
   ! Reading the header of psf file
   
@@ -280,31 +267,8 @@ program g_solute_solvent
   allocate( eps(natom), sig(natom), q(natom), e(natom), s(natom), mass(natom),&
             segat(natom), resat(natom), classat(natom), typeat(natom), class(natom),&
             resid(natom), natres(natom), fatres(natom), fatrsolute(natom),&
-            fatrsolvent(natom), irsolv(natom), solute2(natom) )
+            fatrsolvent(natom), irsolv(natom), index_solute(natom) )
 
-  ! These will contain indexes for the atoms of the randomly generated solvent molecules,
-  ! which are more than the number of the atoms of the solvent in the actual
-  ! simulation. Therefore, 2*natom is an overstimated guess. If this turns out not
-  ! to be sufficient, it will be fixed afterwards.
-
-  allocate( solvent_random(2*natom), irsolv_random(2*natom) )
-
-  ! Reading parameter files to get the vdW sigmas for the definition of exclusion
-  ! zones
-  
-  nclass = 0
-  open(10,file=inputfile,action='read',status='old')
-  do while(.true.)
-    read(10,"( a200 )",iostat=status) record
-    if(status /= 0) exit
-    if(keyword(record) == 'par') then
-      file = value(record)
-      write(*,*) ' Reading parameter file: ', file(1:length(file))
-      call readpar(file,nclass,class,eps,sig)
-    end if
-  end do
-  close(10)
-  
   ! Conversion factor for volumes (as KB integrals), from A^3 to cm^3/mol
 
   convert = mole / 1.e24
@@ -331,9 +295,9 @@ program g_solute_solvent
   write(*,*) ' Width of histogram bins: ', binstep
   write(*,*) ' Number of bins of histograms: ', nbins
 
-  ! Allocate gss array according to nbins
+  ! Allocate gmd array according to nbins
 
-  allocate( gss(nbins), site_count(nbins), site_count_random(nbins), shellvolume(nbins), &
+  allocate( gmd(nbins), site_count(nbins), shellvolume_at_frame(nbins), shellvolume(nbins), &
             site_count_at_frame(nbins) )
   
   ! Check for simple input errors
@@ -470,10 +434,22 @@ program g_solute_solvent
   ! This is for the initialization of the smalldistances routine
 
   maxsmalld = nrsolvent
+  nrandom = (natom-nsolute)*nintegral
   allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
-  maxatom = 2*natom
+  maxatom = nsolute + nrandom
   allocate( x(maxatom), y(maxatom), z(maxatom) )
   allocate( imind(nrsolvent), mind_mol(nrsolvent), mind_atom(nsolvent) )
+
+  ! Indexes of solute and solvent atom for smalldistances
+
+  allocate( index_solute(nsolute) )
+  do i = 1, nsolute
+    index_solute(i) = i
+  end do
+  allocate( index_random(nrandom) )
+  do i = 1, nrandom
+    index_random(i) = i + nsolute
+  end do
 
   ! Output some group properties for testing purposes
   
@@ -501,16 +477,9 @@ program g_solute_solvent
   ! Allocate solvent molecule (this will be used to generate random coordinates
   ! for each solvent molecule, one at a time, later)
   
-  allocate( solvent_molecule(natoms_solvent,3), &
-            xref(natoms_solvent), yref(natoms_solvent), zref(natoms_solvent),&
-            xrnd(natoms_solvent), yrnd(natoms_solvent), zrnd(natoms_solvent) )
-  allocate( gss_atom_contribution(natoms_solvent,nbins), &
-            gss_atom_contribution_random(natoms_solvent,nbins) )
+  allocate( gmd_atom_contribution(natoms_solvent,nbins) ) 
   allocate( site_count_atom(natoms_solvent,nbins), &
-            site_count_atom_random(natoms_solvent,nbins), &
-            gss_atom(natoms_solvent,nbins), &
-            phi_atom(natoms_solvent,nbins), &
-            gamma_atom(natoms_solvent,nbins) )
+            gmd_atom(natoms_solvent,nbins) )
   
   ! Checking if dcd file contains periodic cell information
   
@@ -563,16 +532,14 @@ program g_solute_solvent
     site_count_random(i) = 0.e0
     shellvolume(i) = 0.e0
     do j = 1, natoms_solvent
-      gss_atom_contribution(j,i) = 0.e0
-      gss_atom_contribution_random(j,i) = 0.e0
+      gmd_atom_contribution(j,i) = 0.e0
       site_count_atom(j,i) = 0.e0
-      site_count_atom_random(j,i) = 0.e0
     end do
   end do
   bulkdensity = 0.e0
   simdensity = 0.e0
 
-  ! Reading dcd file and computing the gss function
+  ! Reading dcd file and computing the gmd function
    
   iframe = 0
   do icycle = 1, ncycles 
@@ -611,7 +578,7 @@ program g_solute_solvent
       write(*,"(' Computing: ',f6.2,'%')",advance='no') 0.
     end if
   
-    ! Computing the gss function
+    ! Computing the gmd function
   
     iatom = 0
     do kframe = 1, nfrcycle
@@ -637,7 +604,7 @@ program g_solute_solvent
       end if
 
       !
-      ! Computing the GSS data the simulation
+      ! Computing the GMD from simulation data
       !
 
       do i = 1, nsolute
@@ -668,7 +635,7 @@ program g_solute_solvent
       end do
 
       !
-      ! Computing the gss functions from distance data
+      ! Computing the gmd functions from distance data
       !
 
       ! For each solvent residue, get the MINIMUM distance to the solute
@@ -681,7 +648,7 @@ program g_solute_solvent
         mind_atom(i) = cutoff + 1.e0
       end do
       do i = 1, nsmalld
-        ! Counting for computing the whole-molecule gss 
+        ! Counting for computing the whole-molecule gmd 
         isolvent = irsolv(ismalld(i))
         if ( dsmalld(i) < mind_mol(isolvent) ) then
           mind_mol(isolvent) = dsmalld(i)
@@ -689,13 +656,13 @@ program g_solute_solvent
           if ( j == 0 ) j = natoms_solvent
           imind(isolvent) = j
         end if
-        ! Counting for computing atom-specific gss
+        ! Counting for computing atom-specific gmd
         if ( dsmalld(i) < mind_atom(ismalld(i)) ) then
           mind_atom(ismalld(i)) = dsmalld(i)
         end if
       end do
 
-      ! Summing up current data to the gss histogram
+      ! Summing up current data to the gmd histogram
 
       do i = 1, nbins
         site_count_at_frame(i) = 0.e0
@@ -706,7 +673,7 @@ program g_solute_solvent
           site_count(irad) = site_count(irad) + 1.e0
           site_count_at_frame(irad) = site_count_at_frame(irad) + 1.e0
           if ( imind(i) > 0 ) then
-            gss_atom_contribution(imind(i),irad) = gss_atom_contribution(imind(i),irad) + 1.e0
+            gmd_atom_contribution(imind(i),irad) = gmd_atom_contribution(imind(i),irad) + 1.e0
           end if
         end if
       end do
@@ -730,134 +697,18 @@ program g_solute_solvent
         x(i) = xdcd(ii)
         y(i) = ydcd(ii)
         z(i) = zdcd(ii)
-        solute2(i) = i
       end do
 
       ! Total volume of the box at this frame
 
       totalvolume = axis(1)*axis(2)*axis(3)
 
-      ! Very rough (over)estimate of the solute partial volume
+      ! Generating random point for numerical volume integration
 
-      solute_volume = nsolute*(4./3.)*pi*9.
-
-      ! First (over)esimate of the number of solvent molecules that must
-      ! be used for normalization
-
-      nrsolvent_random = nintegral*nint(nrsolvent*totalvolume/(totalvolume-solute_volume))
-
-      ! Checking if imind is large enough
-
-      if ( size(imind) < nrsolvent_random ) then
-        deallocate(imind)
-        allocate(imind(nrsolvent_random))
-      end if
-
-      !
-      ! Using this large sampling of random solvent positions, we will compute the
-      ! minimum-distance distribution function, which will we first be used only
-      ! to estimate the (minimum-distance) volume of the bulk region. Aftwerwards,
-      ! the actual normalization is computed from a subset of this solvent molecules
-      ! with the better estimate of the (minimum-distance) bulk density. 
-      !
-
-      natsolvent_random = natoms_solvent*nrsolvent_random
-
-      ! Checking the size of the arrays and updating if necessary
-
-      if ( size(mind_atom) < natsolvent_random ) then
-        deallocate( mind_atom )
-        allocate( mind_atom(nrsolvent_random*natoms_solvent) )
-      end if
-      if ( size(solvent_random) < natsolvent_random ) then
-        deallocate( solvent_random, irsolv_random ) 
-        allocate( solvent_random(natsolvent_random), irsolv_random(natsolvent_random) )
-      end if
-      if ( size(x) < nsolute+natsolvent_random ) then
-        deallocate( x, y, z )
-        allocate( x(nsolute+natsolvent_random), &
-                  y(nsolute+natsolvent_random), &
-                  z(nsolute+natsolvent_random) )
-        do i = 1, nsolute
-          ii = iatom + solute(i)
-          x(i) = xdcd(ii)
-          y(i) = ydcd(ii)
-          z(i) = zdcd(ii)
-          solute2(i) = i
-        end do
-      end if
-      if ( size(dsmalld) < natsolvent_random*nsolute ) then
-        deallocate( dsmalld, ismalld ) 
-        allocate( dsmalld(natsolvent_random*nsolute), ismalld(natsolvent_random*nsolute) )
-      end if
-      if ( size(mind_mol) < nrsolvent_random ) then
-        deallocate( mind_mol )
-        allocate( mind_mol(nrsolvent_random) )
-      end if
-
-      !
-      ! Generating random distribution of solvent molecules in box
-      !
-
-      do isolvent_random = 1, nrsolvent_random
-
-        ! First, pick randomly a solvent molecule from the box, to minimize conformational
-        ! biases of the solvent molecules
-    
-        ii = (nrsolvent-1)*int(random()) + 1
-
-        ! Save the coordinates of this molecule in this frame in the solvent_molecule array
-    
-        jj = iatom + solvent(1) + natoms_solvent*(ii-1)
-        do i = 1, natoms_solvent
-          solvent_molecule(i,1) = xdcd(jj+i-1)
-          solvent_molecule(i,2) = ydcd(jj+i-1)
-          solvent_molecule(i,3) = zdcd(jj+i-1)
-        end do
-
-        ! Put molecule in its center of coordinates for it to be the reference coordinate for the 
-        ! random coordinates that will be generated
-  
-        cmx = 0.
-        cmy = 0.
-        cmz = 0.
-        do i = 1, natoms_solvent
-          cmx = cmx + solvent_molecule(i,1)
-          cmy = cmy + solvent_molecule(i,2)
-          cmz = cmz + solvent_molecule(i,3)
-        end do
-        cmx = cmx / float(natoms_solvent)
-        cmy = cmy / float(natoms_solvent)
-        cmz = cmz / float(natoms_solvent)
-        do i = 1, natoms_solvent
-          xref(i) = solvent_molecule(i,1) - cmx
-          yref(i) = solvent_molecule(i,2) - cmy
-          zref(i) = solvent_molecule(i,3) - cmz
-        end do
-
-        ! Generate a random position for this molecule
-  
-        cmx = -axis(1)/2. + random()*axis(1) 
-        cmy = -axis(2)/2. + random()*axis(2) 
-        cmz = -axis(3)/2. + random()*axis(3) 
-        beta = random()*2.e0*pi
-        gamma = random()*2.e0*pi
-        theta = random()*2.e0*pi
-        call compcart(natoms_solvent,xref,yref,zref,xrnd,yrnd,zrnd,&
-                      cmx,cmy,cmz,beta,gamma,theta)
-
-        ! Add this molecule to x, y, z arrays
-
-        do i = 1, natoms_solvent
-          ii = nsolute + (isolvent_random-1)*natoms_solvent + i
-          x(ii) = xrnd(i)
-          y(ii) = yrnd(i)
-          z(ii) = zrnd(i)
-          solvent_random(ii-nsolute) = ii
-          ! Annotate to which molecule this atom pertains
-          irsolv_random(ii-nsolute) = isolvent_random
-        end do
-
+      do i = nsolute + 1, nsolute + nintegral*(natom-nsolute) 
+        x(i) = -axis(1)/2. + random()*axis(1) 
+        y(i) = -axis(2)/2. + random()*axis(2) 
+        z(i) = -axis(3)/2. + random()*axis(3) 
       end do
 
       ! The solute atom was already added to the xyz array for computing volumes, so now
@@ -866,7 +717,7 @@ program g_solute_solvent
       memerror = .true.
       do while ( memerror ) 
         memerror = .false.
-        call smalldistances(nsolute,solute2,natsolvent_random,solvent_random,x,y,z,cutoff,&
+        call smalldistances(nsolute,index_solute,nrandom,index_random,x,y,z,cutoff,&
                             nsmalld,ismalld,dsmalld,axis,maxsmalld,memerror)
         if ( memerror ) then
           deallocate( ismalld, dsmalld )
@@ -875,37 +726,28 @@ program g_solute_solvent
         end if
       end do
 
-      ! Up to now, we are only interested in the site count in the bulk region, as set
-      ! by the user 
+      ! Computing shell volumes
 
-      do i = 1, nrsolvent_random
-        mind_mol(i) = cutoff + 1.e0
-        imind(i) = 0
+      do i = 1, nbins
+        shellvolume_at_frame(i) = 0.e0
       end do
       do i = 1, nsmalld
-        isolvent = irsolv_random(ismalld(i))
-        if ( dsmalld(i) < mind_mol(isolvent) ) then
-          mind_mol(isolvent) = dsmalld(i)
-          j = mod(ismalld(i),natoms_solvent) 
-          if ( j == 0 ) j = natoms_solvent
-          imind(isolvent) = j
-        end if
+        irad = int(float(nbins)*dsmalld(i)/cutoff)+1
+        shellvolume_at_frame(irad) = shellvolume_at_frame(irad) + 1.e0
       end do
-      
-      ! Compute the fraction of minimum distance sites found at the bulk volume region
-
-      nbulk = 0
-      do i = 1, nrsolvent_random
-        if ( mind_mol(i) >= dbulk .and. mind_mol(i) <= cutoff ) then
-          nbulk = nbulk + 1
-        end if
+      do i = 1, nbins
+        shellvolume_at_frame(i) = shellvolume_at_frame(i) * totalvolume / nrandom
+        shellvolume(i) = shellvolume(i) + shellvolume_at_frame(i)
       end do
 
-      ! The minimum-distance volume of the bulk is, then...
+      ! Computing the total bulk volume
 
-      bulkvolume = (float(nbulk)/nrsolvent_random)*totalvolume 
+      bulkvolume = 0.e0
+      do i = ibulk, nbins
+        bulkvolume =  bulkvolume + shellvolume_at_frame(i)
+      end do
 
-      ! Therefore, since we have already computed the gss at these distances,
+      ! Therefore, since we have already computed the gmd at these distances,
       ! we can estimate the minimum-distance bulk density
 
       site_sum = 0.e0
@@ -918,46 +760,6 @@ program g_solute_solvent
 
       simdensity = simdensity + nrsolvent/totalvolume
       bulkdensity = bulkdensity + bulkdensity_at_frame
-
-      ! With the bulk density properly estimated, we now compute the total
-      ! number of random molecules that should actually be used for normalization, 
-      ! which should be bulkdensity*totalvolume. Therefore, the site count above
-      ! is overstimated because the density is greater than the actual desired 
-      ! density by
-
-      density_fix = (bulkdensity_at_frame*totalvolume)/nrsolvent_random
-
-      ! So lets count the sites at each bin distance for the ideal gas distribution
-      ! rescaled for the correct density
-
-      do i = 1, nrsolvent_random
-        irad = int(float(nbins)*mind_mol(i)/cutoff)+1
-        if ( irad <= nbins ) then
-          site_count_random(irad) = site_count_random(irad) + 1.e0*density_fix
-          if ( imind(i) > 0 ) then
-            gss_atom_contribution_random(imind(i),irad) = gss_atom_contribution_random(imind(i),irad) + 1.e0*density_fix
-          end if
-        end if
-      end do
-
-      ! Accumulate site count for each atom
-
-      do i = 1, natsolvent_random
-        mind_atom(i) = cutoff + 1.e0
-      end do
-      do i = 1, nsmalld
-        if ( dsmalld(i) < mind_atom(ismalld(i)) ) then
-          mind_atom(ismalld(i)) = dsmalld(i)
-        end if
-      end do
-      do i = 1, natsolvent_random
-        irad = int(float(nbins)*mind_atom(i)/cutoff)+1
-        if ( irad <= nbins ) then
-          j = mod(i,natoms_solvent) 
-          if ( j == 0 ) j = natoms_solvent
-          site_count_atom_random(j,irad) = site_count_atom_random(j,irad) + 1.e0*density_fix
-        end if
-      end do
 
       ! Write progress
 
@@ -983,59 +785,32 @@ program g_solute_solvent
   simdensity = simdensity / frames
   do i = 1, nbins
 
-    ! GSS distributions
+    ! GMD distributions
 
     site_count(i) = site_count(i)/frames
-    site_count_random(i) = site_count_random(i)/frames
-    shellvolume(i) = site_count_random(i)/bulkdensity
+    shellvolume(i) = shellvolume(i)/frames
 
-    if ( site_count_random(i) > 0.e0 ) then
-      gss(i) = site_count(i)/site_count_random(i)
+    if ( shellvolume(i) > 0.e0 ) then
+      gmd(i) = site_count(i)/(shellvolume(i)*bulkdensity)
       do j = 1, natoms_solvent
-        gss_atom_contribution(j,i) = gss_atom_contribution(j,i)/frames  
-        gss_atom_contribution(j,i) = gss_atom_contribution(j,i)/site_count_random(i)
+        gmd_atom_contribution(j,i) = gmd_atom_contribution(j,i)/frames  
+        gmd_atom_contribution(j,i) = gmd_atom_contribution(j,i)/(shellvolume(i)*bulkdensity)
       end do
     else
-      gss(i) = 0.e0
+      gmd(i) = 0.e0
       do j = 1, natoms_solvent
-        gss_atom_contribution(j,i) = 0.e0
+        gmd_atom_contribution(j,i) = 0.e0
       end do
     end if
 
     ! Additional distribution required for computing atomic parameters
     
-    if ( site_count_random(i) > 0.e0 ) then
-      do j = 1, natoms_solvent
-        gss_atom_contribution_random(j,i) = gss_atom_contribution_random(j,i)/frames  
-        gss_atom_contribution_random(j,i) = gss_atom_contribution_random(j,i)/site_count_random(i)
-      end do
-    else
-      do j = 1, natoms_solvent
-        gss_atom_contribution_random(j,i) = 0.e0
-      end do
-    end if
     do j = 1, natoms_solvent
       site_count_atom(j,i) = site_count_atom(j,i) / frames
-      site_count_atom_random(j,i) = site_count_atom_random(j,i) / frames
-      if ( site_count_atom_random(j,i) > 0.e0 ) then
-        gss_atom(j,i) = site_count_atom(j,i) / site_count_atom_random(j,i)
+      if ( shellvolume(i) > 0.e0 ) then
+        gmd_atom(j,i) = site_count_atom(j,i) / (shellvolume(i)*bulkdensity)
       else
-        gss_atom(j,i) = 0.e0
-      end if
-    end do
-
-    ! Final atomic distribution parameters
-
-    do j = 1, natoms_solvent
-      if ( gss_atom_contribution_random(j,i) > 0.e0 ) then
-        gamma_atom(j,i) = gss_atom_contribution(j,i)/gss_atom_contribution_random(j,i)
-      else
-        gamma_atom(j,i) = 1.e0
-      end if
-      if ( gss_atom(j,i) > 0.e0 ) then
-        phi_atom(j,i) = gamma_atom(j,i)/gss_atom(j,i)
-      else
-        phi_atom(j,i) = 1.d0
+        gmd_atom(j,i) = 0.e0
       end if
     end do
 
@@ -1055,12 +830,12 @@ program g_solute_solvent
   ! Open output file and writes all information of this run
 
   !
-  ! GSS computed with minimum distance
+  ! GMD computed with minimum distance
   !
   
   open(20,file=output(1:length(output)))
   write(20,"( '#',/,&
-             &'# Output of gss.f90: Using MINIMUM distance to solute.',/,&
+             &'# Output of gmd.f90: Using MINIMUM distance to solute.',/,&
              &'# Input file: ',a,/,& 
              &'# DCD file: ',a,/,& 
              &'# Group file: ',a,/,&
@@ -1094,41 +869,40 @@ program g_solute_solvent
 
   bulkerror = 0.e0
   do i = ibulk, nbins
-    bulkerror = bulkerror + gss(i)
+    bulkerror = bulkerror + gmd(i)
   end do
   bulkerror = bulkerror / ( nbins-ibulk+1 )
   do i = ibulk, nbins
-    sdbulkerror = (bulkerror - gss(i))**2
+    sdbulkerror = (bulkerror - gmd(i))**2
   end do
   sdbulkerror = sqrt(sdbulkerror/(nbins-ibulk+1))
   write(*,*)
-  write(*,"('  Average and standard deviation of bulk-gss: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
+  write(*,"('  Average and standard deviation of bulk-gmd: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
   write(20,"('#')")
-  write(20,"('# Average and standard deviation of bulk-gss: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
+  write(20,"('# Average and standard deviation of bulk-gmd: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
 
   ! Output table
 
   write(20,"( '# COLUMNS CORRESPOND TO: ',/,&
   &'#       1  Minimum distance to solute (dmin)',/,&
-  &'#       2  GSS distribution, normalized by ideal gas distribution. ',/,&
-  &'#       3  Site count for each dmin (GSS without normalization).',/,&
-  &'#       4  Site count for ideal gas distribution.',/,&
-  &'#       5  Shell volume associated with each dmin. ',/,&
-  &'#       6  Spherical shell volume with radius dmin. ',/,&
-  &'#       7  GSS normalized with spherical shell volume. ',/,&
-  &'#       8  Kirwood-Buff integral (cc/mol) computed from column 2. ',/,&
-  &'#       9  Kirwood-Buff integral (cc/mol) computed from column 2 with spherical shell volume (int 4*pi*r^2*(gss-1) dr ',/,&
-  &'#      10  Spherical-shifted minimum distance ')")
+  &'#       2  GMD distribution. ',/,&
+  &'#       3  Site count for each dmin (GMD without normalization).',/,&
+  &'#       4  Shell volume associated with each dmin. ',/,&
+  &'#       5  Spherical shell volume with radius dmin. ',/,&
+  &'#       6  GMD normalized with spherical shell volume. ',/,&
+  &'#       7  Kirwood-Buff integral (cc/mol) computed from column 2. ',/,&
+  &'#       8  Kirwood-Buff integral (cc/mol) computed from column 2 with spherical shell volume (int 4*pi*r^2*(gmd-1) dr ',/,&
+  &'#       9  Spherical-shifted minimum distance ')")
   write(20,"('#')")
-  write(20,"('#   1-DISTANCE         2-GSS  3-SITE COUNT  4-COUNT RAND   5-SHELL VOL  6-SPHERE VOL  7-GSS/SPHERE      8-KB INT&
-            &   9-KB SPHERE     10-RSHIFT')")
+  write(20,"('#   1-DISTANCE         2-GMD  3-SITE COUNT  4-SHELL VOL  5-SPHERE VOL  6-GMD/SPHERE      7-KB INT&
+            &   8-KB SPHERE      9-RSHIFT')")
 
   kbint = 0.e0
   kbintsphere = 0.e0
   do i = 1, nbins
 
     ! KB integral using shell volumes computed
-    kbint = kbint + convert*(gss(i)-1.e0)*shellvolume(i)
+    kbint = kbint + convert*(gmd(i)-1.e0)*shellvolume(i)
 
     ! KB integral using spherical shell volume 
     kbintsphere = kbintsphere + &
@@ -1137,30 +911,29 @@ program g_solute_solvent
     ! Distance transformation
     rshift = sphereradiusfromshellvolume(shellvolume(i),binstep)
 
-    lineformat = "(10(tr2,f12.7))"
+    lineformat = "(9(tr2,f12.7))"
     if ( abs(kbint) > 999.e0 .or. abs(kbintsphere) > 999.e0 ) then
       lineformat = "(7(tr2,f12.7),2(tr2,e12.5),(tr2,f12.7))"
     end if
 
     write(20,lineformat) &
     shellradius(i,binstep),&                                      !  1-DISTANCE
-    gss(i),&                                                      !  2-GSS
+    gmd(i),&                                                      !  2-GMD
     site_count(i),&                                               !  3-SITE COUNT
-    site_count_random(i),&                                        !  4-COUNT RAND
-    shellvolume(i),&                                              !  5-SHELL VOL
-    sphericalshellvolume(i,binstep),&                             !  6-SPHER VOL
-    site_count(i)/(bulkdensity*sphericalshellvolume(i,binstep)),& !  7-GSS/SPHER
-    kbint,&                                                       !  8-KB INT
-    kbintsphere,&                                                 !  9-KB SPHER
-    rshift                                                        ! 10-RSHIFT
+    shellvolume(i),&                                              !  4-SHELL VOL
+    sphericalshellvolume(i,binstep),&                             !  5-SPHER VOL
+    site_count(i)/(bulkdensity*sphericalshellvolume(i,binstep)),& !  6-GMD/SPHER
+    kbint,&                                                       !  7-KB INT
+    kbintsphere,&                                                 !  8-KB SPHER
+    rshift                                                        !  9-RSHIFT
 
   end do
   close(20)
 
-  ! Writting gss per atom contributions 
+  ! Writting gmd per atom contributions 
 
   open(20,file=output_atom_contrib)
-  write(20,"(a)") "# Total GSS contribution per atom. "
+  write(20,"(a)") "# Total GMD contribution per atom. "
   write(20,"( '#',/,&
              &'# Input file: ',a,/,& 
              &'# DCD file: ',a,/,& 
@@ -1172,18 +945,18 @@ program g_solute_solvent
     write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solvent(i)), classat(solvent(i)), mass(solvent(i))
   end do
   write(20,"(a)") "#"
-  write(lineformat,*) "('#',t7,'DISTANCE     GSS TOTAL',",natoms_solvent,"(tr2,i12) )"
+  write(lineformat,*) "('#',t7,'DISTANCE     GMD TOTAL',",natoms_solvent,"(tr2,i12) )"
   write(20,lineformat) (i,i=1,natoms_solvent)
   write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
   do i = 1, nbins
-    write(20,lineformat) shellradius(i,binstep), gss(i), (gss_atom_contribution(j,i),j=1,natoms_solvent)
+    write(20,lineformat) shellradius(i,binstep), gmd(i), (gmd_atom_contribution(j,i),j=1,natoms_solvent)
   end do
   close(20)
 
-  ! Writting independent atomic GSSs
-
-  open(20,file=output_atom_gss)
-  write(20,"(a)") "# Indepdendent GSS for each atom "
+  ! Writting independent atomic GMDs
+  
+  open(20,file=output_atom_gmd)
+  write(20,"(a)") "# Indepdendent GMD for each atom "
   write(20,"( '#',/,&
              &'# Input file: ',a,/,& 
              &'# DCD file: ',a,/,& 
@@ -1195,57 +968,11 @@ program g_solute_solvent
     write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solvent(i)), classat(solvent(i)), mass(solvent(i))
   end do
   write(20,"(a)") "#"
-  write(lineformat,*) "('#',t7,'DISTANCE     GSS TOTAL',",natoms_solvent,"(tr2,i12) )"
+  write(lineformat,*) "('#',t7,'DISTANCE     GMD TOTAL',",natoms_solvent,"(tr2,i12) )"
   write(20,lineformat) (i,i=1,natoms_solvent)
   write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
   do i = 1, nbins
-    write(20,lineformat) shellradius(i,binstep), gss(i), (gss_atom(j,i),j=1,natoms_solvent)
-  end do
-  close(20)
-
-  ! Writting atomic gamma parameters
-
-  open(20,file=output_atom_gamma)
-  write(20,"(a)") "# Atomic gss gamma parameters "
-  write(20,"( '#',/,&
-             &'# Input file: ',a,/,& 
-             &'# DCD file: ',a,/,& 
-             &'# Group file: ',a,/,&
-             &'# PSF file: ' )")
-  write(20,"(a)") "#"
-  write(20,"(a)") "# Atoms: "
-  do i = 1, natoms_solvent
-    write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solvent(i)), classat(solvent(i)), mass(solvent(i))
-  end do
-  write(20,"(a)") "#"
-  write(lineformat,*) "('#',t7,'DISTANCE     GSS TOTAL',",natoms_solvent,"(tr2,i12) )"
-  write(20,lineformat) (i,i=1,natoms_solvent)
-  write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
-  do i = 1, nbins
-    write(20,lineformat) shellradius(i,binstep), gss(i), (gamma_atom(j,i),j=1,natoms_solvent)
-  end do
-  close(20)
-
-  ! Writting orientational PHI parameter
-
-  open(20,file=output_atom_phi)
-  write(20,"(a)") "# Indepdendent GSS for each atom "
-  write(20,"( '#',/,&
-             &'# Input file: ',a,/,& 
-             &'# DCD file: ',a,/,& 
-             &'# Group file: ',a,/,&
-             &'# PSF file: ' )")
-  write(20,"(a)") "#"
-  write(20,"(a)") "# Atoms: "
-  do i = 1, natoms_solvent
-    write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solvent(i)), classat(solvent(i)), mass(solvent(i))
-  end do
-  write(20,"(a)") "#"
-  write(lineformat,*) "('#',t7,'DISTANCE     GSS TOTAL',",natoms_solvent,"(tr2,i12) )"
-  write(20,lineformat) (i,i=1,natoms_solvent)
-  write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
-  do i = 1, nbins
-    write(20,lineformat) shellradius(i,binstep), gss(i), (phi_atom(j,i),j=1,natoms_solvent)
+    write(20,lineformat) shellradius(i,binstep), gmd(i), (gmd_atom(j,i),j=1,natoms_solvent)
   end do
   close(20)
 
@@ -1257,15 +984,15 @@ program g_solute_solvent
   write(*,*)
   write(*,*) ' OUTPUT FILES: ' 
   write(*,*)
-  write(*,*) ' Wrote GSS output file: ', trim(adjustl(output))
-  write(*,*) ' Wrote atomic GSS to file: ', trim(adjustl(output_atom_gss)) 
+  write(*,*) ' Wrote GMD output file: ', trim(adjustl(output))
+  write(*,*) ' Wrote atomic GMD to file: ', trim(adjustl(output_atom_gmd)) 
   write(*,*) ' Wrote atomic gamma to file: ', trim(adjustl(output_atom_gamma))
   write(*,*) ' Wrote atomic phi to file: ', trim(adjustl(output_atom_phi))
   write(*,*) ' Wrote atomic contributions to file: ', trim(adjustl(output_atom_contrib))
-  write(*,*) ' Wrote GSS output file: ', trim(adjustl(output))
+  write(*,*) ' Wrote GMD output file: ', trim(adjustl(output))
   write(*,*)
   write(*,*) ' Which contains the volume-normalized and'
-  write(*,*) ' unnormalized gss functions. '
+  write(*,*) ' unnormalized gmd functions. '
   write(*,*) 
   write(*,*) ' Running time: ', time0
   write(*,*) '####################################################'
@@ -1275,7 +1002,7 @@ program g_solute_solvent
   write(*,*) '####################################################'
   write(*,*)        
 
-end program g_solute_solvent
+end program g_minimum_distance
 
 ! Computes the volume of the spherical shell 
 ! defined within [(i-1)*step,i*step]
