@@ -778,6 +778,13 @@ program g_solute_solvent
         allocate( x(nsolute+natsolvent_random), &
                   y(nsolute+natsolvent_random), &
                   z(nsolute+natsolvent_random) )
+        do i = 1, nsolute
+          ii = iatom + solute(i)
+          x(i) = xdcd(ii)
+          y(i) = ydcd(ii)
+          z(i) = zdcd(ii)
+          solute2(i) = i
+        end do
       end if
       if ( size(dsmalld) < natsolvent_random*nsolute ) then
         deallocate( dsmalld, ismalld ) 
@@ -896,9 +903,6 @@ program g_solute_solvent
 
       ! The minimum-distance volume of the bulk is, then...
 
-!voltar
-write(*,*) nbulk, nrsolvent_random, totalvolume
-stop
       bulkvolume = (float(nbulk)/nrsolvent_random)*totalvolume 
 
       ! Therefore, since we have already computed the gss at these distances,
