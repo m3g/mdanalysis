@@ -65,7 +65,7 @@ program g_solute_solvent
   integer :: nbulk, ibulk, nintegral
   real :: site_sum, convert, solute_volume
   double precision :: readsidesx, readsidesy, readsidesz, t
-  real :: side(memory,3), mass1, mass2, seed, random, axis(3)
+  real :: side(memory,3), mass1, mass2, random, axis(3)
   real, parameter :: mole = 6.022140857e23
   real :: dummyr, xdcd(memory), ydcd(memory), zdcd(memory),&
           time0, etime, tarray(2),&
@@ -147,7 +147,7 @@ program g_solute_solvent
   
   ! Seed for random number generator
   
-  seed = 0.48154278727e0
+  call init_random_number(1811)
   
   ! Some default parameters
   
@@ -797,7 +797,7 @@ program g_solute_solvent
         ! First, pick randomly a solvent molecule from the box, to minimize conformational
         ! biases of the solvent molecules
     
-        ii = (nrsolvent-1)*int(random(seed)) + 1
+        ii = (nrsolvent-1)*int(random()) + 1
 
         ! Save the coordinates of this molecule in this frame in the solvent_molecule array
     
@@ -830,12 +830,12 @@ program g_solute_solvent
 
         ! Generate a random position for this molecule
   
-        cmx = -axis(1)/2. + random(seed)*axis(1) 
-        cmy = -axis(2)/2. + random(seed)*axis(2) 
-        cmz = -axis(3)/2. + random(seed)*axis(3) 
-        beta = random(seed)*2.e0*pi
-        gamma = random(seed)*2.e0*pi
-        theta = random(seed)*2.e0*pi
+        cmx = -axis(1)/2. + random()*axis(1) 
+        cmy = -axis(2)/2. + random()*axis(2) 
+        cmz = -axis(3)/2. + random()*axis(3) 
+        beta = random()*2.e0*pi
+        gamma = random()*2.e0*pi
+        theta = random()*2.e0*pi
         call compcart(natoms_solvent,xref,yref,zref,xrnd,yrnd,zrnd,&
                       cmx,cmy,cmz,beta,gamma,theta)
 
