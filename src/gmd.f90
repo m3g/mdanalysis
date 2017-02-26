@@ -62,7 +62,7 @@ program g_minimum_distance
   integer :: maxsmalld
   logical :: memerror
   real :: dbulk
-  integer :: ibulk, nintegral
+  integer :: ibulk, nintegral, irandom
   real :: site_sum, convert
   double precision :: readsidesx, readsidesy, readsidesz, t
   real :: side(memory,3), mass1, mass2, random, axis(3)
@@ -96,12 +96,11 @@ program g_minimum_distance
 
   ! These are the global (whole-solvent-molecule) counts of minimum-distances
   real, allocatable :: site_count(:)
-  real, allocatable :: site_count_random(:)
 
   ! This is used only transiently for bulk volume estimate 
   real, allocatable :: site_count_at_frame(:)
 
-  ! This is the resulting gmd (site_count/site_count_random)
+  ! This is the resulting gmd (site_count/(shellvolume*bulkdensity))
   real, allocatable :: gmd(:)
 
   ! These are the counts to compute the gmd per atom
@@ -114,7 +113,7 @@ program g_minimum_distance
   ! Data read from the psf file, not necessarily used here
   real, allocatable :: eps(:), sig(:), q(:), e(:), s(:), mass(:),&
                        x(:), y(:), z(:), dsmalld(:)
-  real, allocatable :: mind_mol(:), mind_atom(:)
+  real, allocatable :: mind_mol(:), mind_atom(:), mind_random(:)
   character(len=6), allocatable :: class(:), segat(:), resat(:),&
                                    typeat(:), classat(:)
   
@@ -267,7 +266,7 @@ program g_minimum_distance
   allocate( eps(natom), sig(natom), q(natom), e(natom), s(natom), mass(natom),&
             segat(natom), resat(natom), classat(natom), typeat(natom), class(natom),&
             resid(natom), natres(natom), fatres(natom), fatrsolute(natom),&
-            fatrsolvent(natom), irsolv(natom), index_solute(natom) )
+            fatrsolvent(natom), irsolv(natom) )
 
   ! Conversion factor for volumes (as KB integrals), from A^3 to cm^3/mol
 
@@ -446,7 +445,7 @@ program g_minimum_distance
   do i = 1, nsolute
     index_solute(i) = i
   end do
-  allocate( index_random(nrandom) )
+  allocate( index_random(nrandom), mind_random(nrandom) )
   do i = 1, nrandom
     index_random(i) = i + nsolute
   end do
@@ -529,7 +528,6 @@ program g_minimum_distance
   
   do i = 1, nbins
     site_count(i) = 0.e0
-    site_count_random(i) = 0.e0
     shellvolume(i) = 0.e0
     do j = 1, natoms_solvent
       gmd_atom_contribution(j,i) = 0.e0
@@ -726,14 +724,28 @@ program g_minimum_distance
         end if
       end do
 
+      ! Annotating the minimum distances of each random point to the protein
+
+      do i = 1, nrandom
+        mind_random(i) = cutoff + 1.e0
+      end do
+      do i = 1, nsmalld
+        irandom = ismalld(i)
+        if ( dsmalld(i) < mind_random(irandom) ) then
+          mind_random(irandom) = dsmalld(i)
+        end if 
+      end do
+
       ! Computing shell volumes
 
       do i = 1, nbins
         shellvolume_at_frame(i) = 0.e0
       end do
-      do i = 1, nsmalld
-        irad = int(float(nbins)*dsmalld(i)/cutoff)+1
-        shellvolume_at_frame(irad) = shellvolume_at_frame(irad) + 1.e0
+      do i = 1, nrandom
+        irad = int(float(nbins)*mind_random(i)/cutoff)+1
+        if ( irad <= nbins ) then
+          shellvolume_at_frame(irad) = shellvolume_at_frame(irad) + 1.e0
+        end if
       end do
       do i = 1, nbins
         shellvolume_at_frame(i) = shellvolume_at_frame(i) * totalvolume / nrandom
@@ -783,6 +795,22 @@ program g_minimum_distance
 
   bulkdensity = bulkdensity / frames
   simdensity = simdensity / frames
+
+  ! Write overall densities and volumes
+
+  write(*,*)
+  write(*,"(a,f12.5)") '  Solvent density in simulation box (sites/A^3): ', simdensity
+  write(*,"(a,f12.5)") '  Estimated bulk solvent density (sites/A^3): ', bulkdensity
+  write(*,*)
+  write(*,"(a,f12.5)") '  Molar volume of solvent simulation box (cc/mol): ', convert/simdensity
+  write(*,"(a,f12.5)") '  Molar volume of solvent in bulk (cc/mol): ', convert/bulkdensity
+
+  solutevolume = convert*nrsolvent*(1.e0/simdensity-1e0/bulkdensity)
+  write(*,*)
+  write(*,"(a,f12.5)") '  Solute partial volume (cc/mol): ', solutevolume
+
+  ! Compute final gmd
+
   do i = 1, nbins
 
     ! GMD distributions
@@ -815,17 +843,6 @@ program g_minimum_distance
     end do
 
   end do
-
-  write(*,*)
-  write(*,"(a,f12.5)") '  Solvent density in simulation box (sites/A^3): ', simdensity
-  write(*,"(a,f12.5)") '  Estimated bulk solvent density (sites/A^3): ', bulkdensity
-  write(*,*)
-  write(*,"(a,f12.5)") '  Molar volume of solvent simulation box (cc/mol): ', convert/simdensity
-  write(*,"(a,f12.5)") '  Molar volume of solvent in bulk (cc/mol): ', convert/bulkdensity
-
-  solutevolume = convert*nrsolvent*(1.e0/simdensity-1e0/bulkdensity)
-  write(*,*)
-  write(*,"(a,f12.5)") '  Solute partial volume (cc/mol): ', solutevolume
 
   ! Open output file and writes all information of this run
 
@@ -894,7 +911,7 @@ program g_minimum_distance
   &'#       8  Kirwood-Buff integral (cc/mol) computed from column 2 with spherical shell volume (int 4*pi*r^2*(gmd-1) dr ',/,&
   &'#       9  Spherical-shifted minimum distance ')")
   write(20,"('#')")
-  write(20,"('#   1-DISTANCE         2-GMD  3-SITE COUNT  4-SHELL VOL  5-SPHERE VOL  6-GMD/SPHERE      7-KB INT&
+  write(20,"('#   1-DISTANCE         2-GMD  3-SITE COUNT   4-SHELL VOL  5-SPHERE VOL  6-GMD/SPHERE      7-KB INT&
             &   8-KB SPHERE      9-RSHIFT')")
 
   kbint = 0.e0
@@ -913,7 +930,7 @@ program g_minimum_distance
 
     lineformat = "(9(tr2,f12.7))"
     if ( abs(kbint) > 999.e0 .or. abs(kbintsphere) > 999.e0 ) then
-      lineformat = "(7(tr2,f12.7),2(tr2,e12.5),(tr2,f12.7))"
+      lineformat = "(6(tr2,f12.7),2(tr2,e12.5),(tr2,f12.7))"
     end if
 
     write(20,lineformat) &
