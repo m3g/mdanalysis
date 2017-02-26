@@ -45,6 +45,7 @@ all : $(BIN)/energy \
       $(BIN)/solvation \
       $(BIN)/gss_maxmin \
       $(BIN)/gss \
+      $(BIN)/gmd \
       $(BIN)/angles \
       $(BIN)/hbonds \
       $(BIN)/globalstructure \
@@ -115,6 +116,20 @@ $(OBJ)/solvation.o : $(SRC)/solvation.f90
 $(BIN)/solvation.sh : $(SCR)/solvation-base.sh
 	sed 's!PWD!$(IDIR)!' $(SCR)/solvation-base.sh > $(BIN)/solvation.sh
 	chmod +x $(BIN)/solvation.sh
+
+#
+# gmd module
+#
+
+$(BIN)/gmd : $(OBJ)/smalldistances.o $(OBJ)/common.o $(OBJ)/gmd.o $(BIN)/gmd.sh
+	$(FORTRAN) $(FLAGS) -o $(BIN)/gmd $(OBJ)/gmd.o $(OBJ)/common.o $(OBJ)/smalldistances.o
+
+$(OBJ)/gmd.o : $(SRC)/gmd.f90
+	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/gmd.o $(SRC)/gmd.f90
+
+$(BIN)/gmd.sh : $(SCR)/gmd-base.sh
+	sed 's!PWD!$(IDIR)!' $(SCR)/gmd-base.sh > $(BIN)/gmd.sh
+	chmod +x $(BIN)/gmd.sh
 
 #
 # gss module
