@@ -548,7 +548,7 @@ program g_solute_solvent
   ! Now going to read the dcd file
   
   memframes = memory / ntotat
-  ncycles = lastframe / memframes + 1
+  ncycles = (lastframe-1) / memframes + 1
   memlast = lastframe - memframes * ( ncycles - 1 )
   write(*,*) ' Will read and store in memory at most ', memframes,&
              ' frames per reading cycle. '

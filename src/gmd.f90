@@ -72,7 +72,7 @@ program g_minimum_distance
           binstep, &
           cutoff,  kbint, kbintsphere, bulkdensity_at_frame
   real :: bulkdensity, totalvolume, bulkvolume, simdensity, solutevolume
-  real :: bulkerror, sdbulkerror
+  real :: bulkerror, sdbulkerror, boxvolumeaverage
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, &
                         lineformat
@@ -516,7 +516,7 @@ program g_minimum_distance
   ! Now going to read the dcd file
   
   memframes = memory / ntotat
-  ncycles = lastframe / memframes + 1
+  ncycles = (lastframe-1) / memframes + 1
   memlast = lastframe - memframes * ( ncycles - 1 )
   write(*,*) ' Will read and store in memory at most ', memframes,&
              ' frames per reading cycle. '
@@ -669,7 +669,6 @@ program g_minimum_distance
         irad = int(float(nbins)*mind_mol(i)/cutoff)+1
         if( irad <= nbins ) then
           site_count(irad) = site_count(irad) + 1.e0
-          site_count_at_frame(irad) = site_count_at_frame(irad) + 1.e0
           if ( imind(i) > 0 ) then
             gmd_atom_contribution(imind(i),irad) = gmd_atom_contribution(imind(i),irad) + 1.e0
           end if
@@ -681,6 +680,9 @@ program g_minimum_distance
           j = mod(i,natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
           site_count_atom(j,irad) = site_count_atom(j,irad) + 1.e0
+          if ( j == 1 ) then
+            site_count_at_frame(irad) = site_count_at_frame(irad) + 1.e0
+          end if
         end if
       end do
 
@@ -700,10 +702,11 @@ program g_minimum_distance
       ! Total volume of the box at this frame
 
       totalvolume = axis(1)*axis(2)*axis(3)
+      boxvolumeaverage = boxvolumeaverage + totalvolume
 
       ! Generating random point for numerical volume integration
 
-      do i = nsolute + 1, nsolute + nintegral*(natom-nsolute) 
+      do i = nsolute + 1, nsolute + nrandom
         x(i) = -axis(1)/2. + random()*axis(1) 
         y(i) = -axis(2)/2. + random()*axis(2) 
         z(i) = -axis(3)/2. + random()*axis(3) 
@@ -795,9 +798,12 @@ program g_minimum_distance
 
   bulkdensity = bulkdensity / frames
   simdensity = simdensity / frames
+  boxvolumeaverage = boxvolumeaverage / frames
 
   ! Write overall densities and volumes
 
+  write(*,*)
+  write(*,"(a,f12.5)") '  Average simulation box volume (A^3): ', boxvolumeaverage
   write(*,*)
   write(*,"(a,f12.5)") '  Solvent density in simulation box (sites/A^3): ', simdensity
   write(*,"(a,f12.5)") '  Estimated bulk solvent density (sites/A^3): ', bulkdensity
@@ -805,7 +811,7 @@ program g_minimum_distance
   write(*,"(a,f12.5)") '  Molar volume of solvent simulation box (cc/mol): ', convert/simdensity
   write(*,"(a,f12.5)") '  Molar volume of solvent in bulk (cc/mol): ', convert/bulkdensity
 
-  solutevolume = convert*nrsolvent*(1.e0/simdensity-1e0/bulkdensity)
+  solutevolume = convert*(boxvolumeaverage*bulkdensity-nrsolvent)/bulkdensity
   write(*,*)
   write(*,"(a,f12.5)") '  Solute partial volume (cc/mol): ', solutevolume
 
