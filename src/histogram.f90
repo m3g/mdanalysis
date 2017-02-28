@@ -34,13 +34,13 @@ real :: val, step, average, sd, integral, pmax
 real, allocatable :: xhist(:), yhist(:)
 character(len=200) :: record, filename, string
 character(len=17) :: number
-logical int0, int1, int2
+logical int0, int1, int2, usrmin, usrmax
 
 ! Default parameter values
 
 col = 1
-min = +1.e30
-max = -1.e30
+min = +1.e30 ; usrmin = .false.
+max = -1.e30 ; usrmax = .false.
 nsteps = 100
 step = -1.e0
 int0 = .false.
@@ -71,10 +71,12 @@ do while( i < narg )
       i = i + 1
       call getarg(i,record)
       read(record,*) max
+      usrmax = .true.
     case('-min')
       i = i + 1
       call getarg(i,record)
       read(record,*) min
+      usrmin = .true.
     case('-nsteps')
       i = i + 1
       call getarg(i,record)
@@ -97,7 +99,7 @@ do while( i < narg )
 end do
 if ( (.not.int0).and.(.not.int1).and.(.not.int2) ) int0 = .true.
 
-! If user defined maximum and minimum values to be used were not set, compute them
+! If user-defined maximum and minimum values to be used were not set, compute them
 ! from data file
 
 open(10,file=filename,action='read')
@@ -123,9 +125,8 @@ do
   end if
 
   ndata = ndata + 1
-  min = min1(val,min)
-  max = max1(val,max)
-
+  if ( .not. usrmin ) min = amin1(val,min)
+  if ( .not. usrmax ) max = amax1(val,max)
 end do
 
 if ( ndata == 0 ) then

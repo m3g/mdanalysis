@@ -902,7 +902,9 @@ program g_solute_solvent
       ! We have just counted the number of times an atom of type 1 was found
       ! at the bulk region. The minimum-distance volume of the bulk is, then...
 
-      bulkvolume = float(nbulk_random)*totalvolume/nrsolvent_random
+      bulkvolume = totalvolume*(float(nbulk_random)/nrsolvent_random)
+write(*,*) ' frac= ', density_fix*float(nbulk_random)/nbulk
+!voltar
 
       ! These are averaged at the end for final report:
 
