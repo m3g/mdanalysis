@@ -96,7 +96,7 @@ program g_solute_solvent
   integer, allocatable :: imind(:)
 
   ! Shell volume, estimated from atom count
-  real, allocatable :: shellvolume(:)
+  real, allocatable :: shellvolume(:), shellvolume_md(:)
 
   ! These are the global (whole-solvent-molecule) counts of minimum-distances
   real, allocatable :: site_count(:)
@@ -330,7 +330,7 @@ program g_solute_solvent
 
   allocate( gss(nbins), kb(nbins), &
             site_count(nbins), site_count_random(nbins), shellvolume(nbins), &
-            site_count_at_frame(nbins) )
+            site_count_at_frame(nbins), shellvolume_md(nbins) )
   
   ! Check for simple input errors
   
@@ -574,6 +574,7 @@ program g_solute_solvent
     site_count(i) = 0.e0
     site_count_random(i) = 0.e0
     shellvolume(i) = 0.e0
+    shellvolume_md(i) = 0.e0
     do j = 1, natoms_solvent
       gss_atom_contribution(j,i) = 0.e0
       gss_atom_contribution_random(j,i) = 0.e0
@@ -843,7 +844,6 @@ program g_solute_solvent
         mind_mol(i) = cutoff + 1.e0
         imind(i) = 0
       end do
-      nbulk_random = 0
       do i = 1, nsmalld
         isolvent = irsolv_random(ismalld(i))
         if ( dsmalld(i) < mind_mol(isolvent) ) then
@@ -861,6 +861,7 @@ program g_solute_solvent
         irad = int(float(nbins)*mind_mol(i)/cutoff)+1
         if ( irad <= nbins ) then
           site_count_random(irad) = site_count_random(irad) + 1.e0*density_fix
+          shellvolume_md(irad) = shellvolume_md(irad) + 1.d0
           if ( imind(i) > 0 ) then
             gss_atom_contribution_random(imind(i),irad) = gss_atom_contribution_random(imind(i),irad) + 1.e0*density_fix
           end if
@@ -877,6 +878,7 @@ program g_solute_solvent
           mind_atom(ismalld(i)) = dsmalld(i)
         end if
       end do
+      nbulk_random = 0
       do i = 1, natsolvent_random
         irad = int(float(nbins)*mind_atom(i)/cutoff)+1
         if ( irad <= nbins ) then
@@ -885,9 +887,12 @@ program g_solute_solvent
           site_count_atom_random(j,irad) = site_count_atom_random(j,irad) + 1.e0*density_fix
 
           ! The counting of single-sites at the bulk region will be used to estimate
-          ! the bulk volume
+          ! the volumes of spherical shells of radius irad
 
-          if ( j == 1 .and. irad >= ibulk ) nbulk_random = nbulk_random + 1
+          if ( j == 1 ) then
+            shellvolume(irad) = shellvolume(irad) + 1.d0
+            if ( irad >= ibulk ) nbulk_random = nbulk_random + 1
+          end if
 
         end if
       end do
@@ -903,8 +908,6 @@ program g_solute_solvent
       ! at the bulk region. The minimum-distance volume of the bulk is, then...
 
       bulkvolume = totalvolume*(float(nbulk_random)/nrsolvent_random)
-write(*,*) ' frac= ', density_fix*float(nbulk_random)/nbulk
-!voltar
 
       ! These are averaged at the end for final report:
 
@@ -939,7 +942,8 @@ write(*,*) ' frac= ', density_fix*float(nbulk_random)/nbulk
 
     site_count(i) = site_count(i)/frames
     site_count_random(i) = site_count_random(i)/frames
-    shellvolume(i) = site_count_random(i)/bulkdensity
+    shellvolume_md(i) = ((shellvolume_md(i)/nrsolvent_random)*totalvolume)/frames
+    shellvolume(i) = ((shellvolume(i)/nrsolvent_random)*totalvolume)/frames
 
     if ( site_count_random(i) > 0.e0 ) then
       gss(i) = site_count(i)/site_count_random(i)
@@ -1084,12 +1088,14 @@ write(*,*) ' frac= ', density_fix*float(nbulk_random)/nbulk
   kbintsphere = 0.e0
   do i = 1, nbins
 
-    ! KB integrals using shell volumes computed
+    ! KB integrals using shell volumes computed. They are computed by ((N-Nr)/Nr)dV = (gss-1)dV without
+    ! the numerical problem associated with a zero count at N
 
     do j = i, nbins
-      kb(j) = kb(j) + convert*(gss(i)-1.e0)*shellvolume(i) 
+      kb(j) = kb(j) + convert*((site_count(i)-site_count_random(i))/site_count_random(i))*shellvolume_md(i) 
       do k = 1, natoms_solvent
-        kb_atom(k,j) = kb_atom(k,j) + convert*(gss_atom(k,i)-1.e0)*shellvolume(i)  
+        kb_atom(k,j) = kb_atom(k,j) &
+                     + convert*((site_count_atom(k,i)-site_count_atom_random(k,i))/site_count_atom_random(k,i))*shellvolume(i)
       end do
     end do
 
@@ -1098,7 +1104,7 @@ write(*,*) ' frac= ', density_fix*float(nbulk_random)/nbulk
                   convert*(site_count(i)/(bulkdensity*sphericalshellvolume(i,binstep))-1.e0)*sphericalshellvolume(i,binstep)
 
     ! Distance transformation
-    rshift = sphereradiusfromshellvolume(shellvolume(i),binstep)
+    rshift = sphereradiusfromshellvolume(shellvolume_md(i),binstep)
 
     lineformat = "(10(tr2,f12.7))"
     if ( abs(kb(i)) > 999.e0 .or. abs(kbintsphere) > 999.e0 ) then
