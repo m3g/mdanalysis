@@ -62,8 +62,8 @@ program g_solute_solvent
   integer :: maxsmalld
   logical :: memerror
   real :: dbulk, density_fix
-  integer :: nbulk, ibulk, nintegral
-  real :: site_sum, convert, solute_volume
+  integer :: nbulk, ibulk, nintegral, nbulk_random
+  real :: convert
   double precision :: readsidesx, readsidesy, readsidesz, t
   real :: side(memory,3), mass1, mass2, random, axis(3)
   real, parameter :: mole = 6.022140857e23
@@ -282,13 +282,6 @@ program g_solute_solvent
             resid(natom), natres(natom), fatres(natom), fatrsolute(natom),&
             fatrsolvent(natom), irsolv(natom), solute2(natom) )
 
-  ! These will contain indexes for the atoms of the randomly generated solvent molecules,
-  ! which are more than the number of the atoms of the solvent in the actual
-  ! simulation. Therefore, 2*natom is an overstimated guess. If this turns out not
-  ! to be sufficient, it will be fixed afterwards.
-
-  allocate( solvent_random(2*natom), irsolv_random(2*natom) )
-
   ! Reading parameter files to get the vdW sigmas for the definition of exclusion
   ! zones
   
@@ -467,14 +460,6 @@ program g_solute_solvent
     irsolv(i) = nrsolvent
   end do
 
-  ! This is for the initialization of the smalldistances routine
-
-  maxsmalld = nrsolvent
-  allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
-  maxatom = 2*natom
-  allocate( x(maxatom), y(maxatom), z(maxatom) )
-  allocate( imind(nrsolvent), mind_mol(nrsolvent), mind_atom(nsolvent) )
-
   ! Output some group properties for testing purposes
   
   write(*,*) ' Number of atoms of solute: ', nsolute 
@@ -498,6 +483,23 @@ program g_solute_solvent
   natoms_solvent = nsolvent / nrsolvent 
   write(*,*)  ' Number of atoms of each solvent molecule: ', natoms_solvent
   
+  ! The number of random molecules for numerical normalization 
+
+  nrsolvent_random = nintegral*nrsolvent
+  density_fix = float(nrsolvent)/nrsolvent_random
+  natsolvent_random = natoms_solvent*nrsolvent_random
+
+  ! Initialization of the smalldistances routine arrays
+ 
+  maxsmalld = nrsolvent_random
+  allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
+
+  ! Allocate xyz and minimum-distance count arrays
+
+  maxatom = nsolute + max(nsolvent,natsolvent_random)
+  allocate( x(maxatom), y(maxatom), z(maxatom) )
+  allocate( imind(nrsolvent_random), mind_mol(nrsolvent_random), mind_atom(natsolvent_random) )
+
   ! Allocate solvent molecule (this will be used to generate random coordinates
   ! for each solvent molecule, one at a time, later)
   
@@ -511,7 +513,13 @@ program g_solute_solvent
             gss_atom(natoms_solvent,nbins), &
             phi_atom(natoms_solvent,nbins), &
             gamma_atom(natoms_solvent,nbins) )
-  
+
+  ! These will contain indexes for the atoms of the randomly generated solvent molecules,
+  ! which are more than the number of the atoms of the solvent in the actual
+  ! simulation. 
+
+  allocate( solvent_random(natsolvent_random), irsolv_random(natsolvent_random) )
+
   ! Checking if dcd file contains periodic cell information
   
   write(*,"( /,tr2,52('-') )")
@@ -697,30 +705,41 @@ program g_solute_solvent
 
       ! Summing up current data to the gss histogram
 
-      do i = 1, nbins
-        site_count_at_frame(i) = 0.e0
-      end do
       do i = 1, nrsolvent
         irad = int(float(nbins)*mind_mol(i)/cutoff)+1
         if( irad <= nbins ) then
           site_count(irad) = site_count(irad) + 1.e0
-          site_count_at_frame(irad) = site_count_at_frame(irad) + 1.e0
           if ( imind(i) > 0 ) then
             gss_atom_contribution(imind(i),irad) = gss_atom_contribution(imind(i),irad) + 1.e0
           end if
         end if
       end do
+
+      ! Site count at frame, to estimate the bulk density, is performed for a
+      ! single solvent reference site, which is taken as atom of type 1 of the solvent
+
+      nbulk = 0
       do i = 1, nsolvent
         irad = int(float(nbins)*mind_atom(i)/cutoff)+1
         if( irad <= nbins ) then
           j = mod(i,natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
           site_count_atom(j,irad) = site_count_atom(j,irad) + 1.e0
+          if ( j == 1 .and. irad >= ibulk ) nbulk = nbulk + 1
         end if
       end do
 
+      ! Total volume of the box at this frame
+
+      totalvolume = axis(1)*axis(2)*axis(3)
+
+      ! This is the average density of the solvent in the simulation box, that will
+      ! be averaged at the end 
+
+      simdensity = simdensity + nrsolvent/totalvolume
+
       !
-      ! Computing volumes
+      ! Computing random counts
       !
 
       ! Solute coordinates are put at the first nsolute positions of x,y,z
@@ -732,68 +751,6 @@ program g_solute_solvent
         z(i) = zdcd(ii)
         solute2(i) = i
       end do
-
-      ! Total volume of the box at this frame
-
-      totalvolume = axis(1)*axis(2)*axis(3)
-
-      ! Very rough (over)estimate of the solute partial volume
-
-      solute_volume = nsolute*(4./3.)*pi*9.
-
-      ! First (over)esimate of the number of solvent molecules that must
-      ! be used for normalization
-
-      nrsolvent_random = nintegral*nint(nrsolvent*totalvolume/(totalvolume-solute_volume))
-
-      ! Checking if imind is large enough
-
-      if ( size(imind) < nrsolvent_random ) then
-        deallocate(imind)
-        allocate(imind(nrsolvent_random))
-      end if
-
-      !
-      ! Using this large sampling of random solvent positions, we will compute the
-      ! minimum-distance distribution function, which will we first be used only
-      ! to estimate the (minimum-distance) volume of the bulk region. Aftwerwards,
-      ! the actual normalization is computed from a subset of this solvent molecules
-      ! with the better estimate of the (minimum-distance) bulk density. 
-      !
-
-      natsolvent_random = natoms_solvent*nrsolvent_random
-
-      ! Checking the size of the arrays and updating if necessary
-
-      if ( size(mind_atom) < natsolvent_random ) then
-        deallocate( mind_atom )
-        allocate( mind_atom(nrsolvent_random*natoms_solvent) )
-      end if
-      if ( size(solvent_random) < natsolvent_random ) then
-        deallocate( solvent_random, irsolv_random ) 
-        allocate( solvent_random(natsolvent_random), irsolv_random(natsolvent_random) )
-      end if
-      if ( size(x) < nsolute+natsolvent_random ) then
-        deallocate( x, y, z )
-        allocate( x(nsolute+natsolvent_random), &
-                  y(nsolute+natsolvent_random), &
-                  z(nsolute+natsolvent_random) )
-        do i = 1, nsolute
-          ii = iatom + solute(i)
-          x(i) = xdcd(ii)
-          y(i) = ydcd(ii)
-          z(i) = zdcd(ii)
-          solute2(i) = i
-        end do
-      end if
-      if ( size(dsmalld) < natsolvent_random*nsolute ) then
-        deallocate( dsmalld, ismalld ) 
-        allocate( dsmalld(natsolvent_random*nsolute), ismalld(natsolvent_random*nsolute) )
-      end if
-      if ( size(mind_mol) < nrsolvent_random ) then
-        deallocate( mind_mol )
-        allocate( mind_mol(nrsolvent_random) )
-      end if
 
       !
       ! Generating random distribution of solvent molecules in box
@@ -875,13 +832,14 @@ program g_solute_solvent
         end if
       end do
 
-      ! Up to now, we are only interested in the site count in the bulk region, as set
-      ! by the user 
+      ! Counting the number or random molecules with minimum distances
+      ! in each region
 
       do i = 1, nrsolvent_random
         mind_mol(i) = cutoff + 1.e0
         imind(i) = 0
       end do
+      nbulk_random = 0
       do i = 1, nsmalld
         isolvent = irsolv_random(ismalld(i))
         if ( dsmalld(i) < mind_mol(isolvent) ) then
@@ -891,43 +849,8 @@ program g_solute_solvent
           imind(isolvent) = j
         end if
       end do
-      
-      ! Compute the fraction of minimum distance sites found at the bulk volume region
 
-      nbulk = 0
-      do i = 1, nrsolvent_random
-        if ( mind_mol(i) >= dbulk .and. mind_mol(i) <= cutoff ) then
-          nbulk = nbulk + 1
-        end if
-      end do
-
-      ! The minimum-distance volume of the bulk is, then...
-
-      bulkvolume = (float(nbulk)/nrsolvent_random)*totalvolume 
-
-      ! Therefore, since we have already computed the gss at these distances,
-      ! we can estimate the minimum-distance bulk density
-
-      site_sum = 0.e0
-      do i = ibulk, nbins
-        site_sum = site_sum + site_count_at_frame(i)
-      end do
-      bulkdensity_at_frame = site_sum/bulkvolume
-
-      ! These are averaged at the end for final report:
-
-      simdensity = simdensity + nrsolvent/totalvolume
-      bulkdensity = bulkdensity + bulkdensity_at_frame
-
-      ! With the bulk density properly estimated, we now compute the total
-      ! number of random molecules that should actually be used for normalization, 
-      ! which should be bulkdensity*totalvolume. Therefore, the site count above
-      ! is overstimated because the density is greater than the actual desired 
-      ! density by
-
-      density_fix = (bulkdensity_at_frame*totalvolume)/nrsolvent_random
-
-      ! So lets count the sites at each bin distance for the ideal gas distribution
+      ! So lets count the sites at each bin distance for the non-interacting distribution 
       ! rescaled for the correct density
 
       do i = 1, nrsolvent_random
@@ -956,8 +879,31 @@ program g_solute_solvent
           j = mod(i,natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
           site_count_atom_random(j,irad) = site_count_atom_random(j,irad) + 1.e0*density_fix
+
+          ! The counting of single-sites at the bulk region will be used to estimate
+          ! the bulk volume
+
+          if ( j == 1 .and. irad >= ibulk ) nbulk_random = nbulk_random + 1
+
         end if
       end do
+      if ( nbulk_random == 0 ) then
+        write(*,*) 
+        write(*,*) ' ERROR: zero volume estimated for bulk region. Either the region is '
+        write(*,*) '        too thin, or there is a numerical error. '
+        write(*,*) ' frame = ', kframe
+        stop
+      end if
+
+      ! We have just counted the number of times an atom of type 1 was found
+      ! at the bulk region. The minimum-distance volume of the bulk is, then...
+
+      bulkvolume = float(nbulk_random)*totalvolume/nrsolvent_random
+
+      ! These are averaged at the end for final report:
+
+      bulkdensity_at_frame = float(nbulk)/bulkvolume
+      bulkdensity = bulkdensity + bulkdensity_at_frame
 
       ! Write progress
 
