@@ -1092,10 +1092,14 @@ program g_solute_solvent
     ! the numerical problem associated with a zero count at N
 
     do j = i, nbins
-      kb(j) = kb(j) + convert*((site_count(i)-site_count_random(i))/site_count_random(i))*shellvolume_md(i) 
+      if ( site_count_random(i) > 0.e0 ) then
+        kb(j) = kb(j) + convert*((site_count(i)-site_count_random(i))/site_count_random(i))*shellvolume_md(i) 
+      end if
       do k = 1, natoms_solvent
-        kb_atom(k,j) = kb_atom(k,j) &
-                     + convert*((site_count_atom(k,i)-site_count_atom_random(k,i))/site_count_atom_random(k,i))*shellvolume(i)
+        if ( site_count_atom_random(k,i) > 0.e0 ) then
+          kb_atom(k,j) = kb_atom(k,j) &
+                       + convert*((site_count_atom(k,i)-site_count_atom_random(k,i))/site_count_atom_random(k,i))*shellvolume(i)
+        end if
       end do
     end do
 
