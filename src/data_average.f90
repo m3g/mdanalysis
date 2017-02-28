@@ -209,7 +209,7 @@ program data_average
   
   ! Computing standard devation, and printing output
 
-  allocate(ysort(nint))
+  allocate(ysort(ndata))
   write(*,"('#            X     Average Y            SD    SD/sqrt(N)        Median')")
   do i = 1, nint
     xint = xmin + step*(i-1)
