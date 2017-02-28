@@ -860,10 +860,10 @@ program g_solute_solvent
       do i = 1, nrsolvent_random
         irad = int(float(nbins)*mind_mol(i)/cutoff)+1
         if ( irad <= nbins ) then
-          site_count_random(irad) = site_count_random(irad) + 1.e0*density_fix
+          site_count_random(irad) = site_count_random(irad) + 1.e0
           shellvolume_md(irad) = shellvolume_md(irad) + 1.d0
           if ( imind(i) > 0 ) then
-            gss_atom_contribution_random(imind(i),irad) = gss_atom_contribution_random(imind(i),irad) + 1.e0*density_fix
+            gss_atom_contribution_random(imind(i),irad) = gss_atom_contribution_random(imind(i),irad) + 1.e0
           end if
         end if
       end do
@@ -884,7 +884,7 @@ program g_solute_solvent
         if ( irad <= nbins ) then
           j = mod(i,natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
-          site_count_atom_random(j,irad) = site_count_atom_random(j,irad) + 1.e0*density_fix
+          site_count_atom_random(j,irad) = site_count_atom_random(j,irad) + 1.e0
 
           ! The counting of single-sites at the bulk region will be used to estimate
           ! the volumes of spherical shells of radius irad
@@ -941,7 +941,7 @@ program g_solute_solvent
     ! GSS distributions
 
     site_count(i) = site_count(i)/frames
-    site_count_random(i) = site_count_random(i)/frames
+    site_count_random(i) = density_fix*site_count_random(i)/frames
     shellvolume_md(i) = ((shellvolume_md(i)/nrsolvent_random)*totalvolume)/frames
     shellvolume(i) = ((shellvolume(i)/nrsolvent_random)*totalvolume)/frames
 
@@ -962,7 +962,7 @@ program g_solute_solvent
     
     if ( site_count_random(i) > 0.e0 ) then
       do j = 1, natoms_solvent
-        gss_atom_contribution_random(j,i) = gss_atom_contribution_random(j,i)/frames  
+        gss_atom_contribution_random(j,i) = density_fix*gss_atom_contribution_random(j,i)/frames  
         gss_atom_contribution_random(j,i) = gss_atom_contribution_random(j,i)/site_count_random(i)
       end do
     else
@@ -972,7 +972,7 @@ program g_solute_solvent
     end if
     do j = 1, natoms_solvent
       site_count_atom(j,i) = site_count_atom(j,i) / frames
-      site_count_atom_random(j,i) = site_count_atom_random(j,i) / frames
+      site_count_atom_random(j,i) = density_fix*site_count_atom_random(j,i) / frames
       if ( site_count_atom_random(j,i) > 0.e0 ) then
         gss_atom(j,i) = site_count_atom(j,i) / site_count_atom_random(j,i)
       else
