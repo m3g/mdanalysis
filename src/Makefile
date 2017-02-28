@@ -39,7 +39,9 @@ IDIR=$(shell dirname `pwd`)
 
 devel : all
 
-all : $(BIN)/energy \
+all : $(BIN) \
+      $(OBJ) \
+      $(BIN)/energy \
       $(BIN)/align \
       $(BIN)/distance \
       $(BIN)/solvation \
@@ -291,13 +293,13 @@ $(OBJ)/data_average.o : $(SRC)/data_average.f90
 # This is common for all packages
 #
 
-$(OBJ)/common.o : $(SRC)/common.f90 $(OBJ) $(BIN)
+$(OBJ)/common.o : $(SRC)/common.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/common.o $(SRC)/common.f90
 
 
-$(OBJ) :
+$(OBJ) : 
 	mkdir -p ../obj
-$(BIN) :
+$(BIN) : 
 	mkdir -p ../bin
 
 warning : 
