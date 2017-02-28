@@ -70,14 +70,15 @@ program g_solute_solvent
   real :: dummyr, xdcd(memory), ydcd(memory), zdcd(memory),&
           time0, etime, tarray(2),&
           binstep, &
-          cutoff,  kbint, kbintsphere, bulkdensity_at_frame
+          cutoff,  kbintsphere, bulkdensity_at_frame
   real :: bulkdensity, totalvolume, bulkvolume, simdensity, solutevolume
   real :: bulkerror, sdbulkerror
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
                         lineformat
   character(len=200) :: output, &
-                        output_atom_gss, output_atom_gamma, output_atom_phi, output_atom_contrib
+                        output_atom_gss, output_atom_gamma, output_atom_phi, &
+                        output_atom_kb, output_atom_contrib
   character(len=4) :: dummyc
   logical :: readfromdcd, dcdaxis, periodic, onscreenprogress
   real :: shellradius, rshift
@@ -105,12 +106,12 @@ program g_solute_solvent
   real, allocatable :: site_count_at_frame(:)
 
   ! This is the resulting gss (site_count/site_count_random)
-  real, allocatable :: gss(:)
+  real, allocatable :: gss(:), kb(:)
 
   ! These are the counts to compute the gss per atom
   real, allocatable :: site_count_atom(:,:)
   real, allocatable :: site_count_atom_random(:,:)
-  real, allocatable :: gss_atom(:,:)
+  real, allocatable :: gss_atom(:,:), kb_atom(:,:)
 
   ! These are to compute the atomic contributions to the gss 
   real, allocatable :: gss_atom_contribution(:,:)
@@ -270,6 +271,7 @@ program g_solute_solvent
   ! Names of atomic output files
   
   output_atom_gss = output(1:length(remove_extension(output)))//"-GSS_PERATOM."//file_extension(output)
+  output_atom_kb = output(1:length(remove_extension(output)))//"-KB_PERATOM."//file_extension(output)
   output_atom_gamma = output(1:length(remove_extension(output)))//"-GAMMA_PERATOM."//file_extension(output)
   output_atom_phi = output(1:length(remove_extension(output)))//"-PHI_PERATOM."//file_extension(output)
   output_atom_contrib = output(1:length(remove_extension(output)))//"-GSS_PERATOM_CONTRIB."//file_extension(output)
@@ -326,7 +328,8 @@ program g_solute_solvent
 
   ! Allocate gss array according to nbins
 
-  allocate( gss(nbins), site_count(nbins), site_count_random(nbins), shellvolume(nbins), &
+  allocate( gss(nbins), kb(nbins), &
+            site_count(nbins), site_count_random(nbins), shellvolume(nbins), &
             site_count_at_frame(nbins) )
   
   ! Check for simple input errors
@@ -511,6 +514,7 @@ program g_solute_solvent
   allocate( site_count_atom(natoms_solvent,nbins), &
             site_count_atom_random(natoms_solvent,nbins), &
             gss_atom(natoms_solvent,nbins), &
+            kb_atom(natoms_solvent,nbins), &
             phi_atom(natoms_solvent,nbins), &
             gamma_atom(natoms_solvent,nbins) )
 
@@ -1069,12 +1073,23 @@ program g_solute_solvent
   write(20,"('#   1-DISTANCE         2-GSS  3-SITE COUNT  4-COUNT RAND   5-SHELL VOL  6-SPHERE VOL  7-GSS/SPHERE      8-KB INT&
             &   9-KB SPHERE     10-RSHIFT')")
 
-  kbint = 0.e0
+  do i = 1, nbins
+    kb(i) = 0.e0
+    do k = 1, natoms_solvent
+      kb_atom(k,i) = 0.e0
+    end do
+  end do
   kbintsphere = 0.e0
   do i = 1, nbins
 
-    ! KB integral using shell volumes computed
-    kbint = kbint + convert*(gss(i)-1.e0)*shellvolume(i)
+    ! KB integrals using shell volumes computed
+
+    do j = i, nbins
+      kb(j) = kb(j) + convert*(gss(i)-1.e0)*shellvolume(i) 
+      do k = 1, natoms_solvent
+        kb_atom(k,j) = kb_atom(k,j) + convert*(gss_atom(k,i)-1.e0)*shellvolume(i)  
+      end do
+    end do
 
     ! KB integral using spherical shell volume 
     kbintsphere = kbintsphere + &
@@ -1084,7 +1099,7 @@ program g_solute_solvent
     rshift = sphereradiusfromshellvolume(shellvolume(i),binstep)
 
     lineformat = "(10(tr2,f12.7))"
-    if ( abs(kbint) > 999.e0 .or. abs(kbintsphere) > 999.e0 ) then
+    if ( abs(kb(i)) > 999.e0 .or. abs(kbintsphere) > 999.e0 ) then
       lineformat = "(7(tr2,f12.7),2(tr2,e12.5),(tr2,f12.7))"
     end if
 
@@ -1096,7 +1111,7 @@ program g_solute_solvent
     shellvolume(i),&                                              !  5-SHELL VOL
     sphericalshellvolume(i,binstep),&                             !  6-SPHER VOL
     site_count(i)/(bulkdensity*sphericalshellvolume(i,binstep)),& !  7-GSS/SPHER
-    kbint,&                                                       !  8-KB INT
+    kb(i),&                                                       !  8-KB INT
     kbintsphere,&                                                 !  9-KB SPHER
     rshift                                                        ! 10-RSHIFT
 
@@ -1146,6 +1161,29 @@ program g_solute_solvent
   write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
   do i = 1, nbins
     write(20,lineformat) shellradius(i,binstep), gss(i), (gss_atom(j,i),j=1,natoms_solvent)
+  end do
+  close(20)
+
+  ! Writting independent atomic KB integrals
+
+  open(20,file=output_atom_kb)
+  write(20,"(a)") "# Indepdendent KB integrals computed from atom distributions "
+  write(20,"( '#',/,&
+             &'# Input file: ',a,/,& 
+             &'# DCD file: ',a,/,& 
+             &'# Group file: ',a,/,&
+             &'# PSF file: ' )")
+  write(20,"(a)") "#"
+  write(20,"(a)") "# Atoms: "
+  do i = 1, natoms_solvent
+    write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solvent(i)), classat(solvent(i)), mass(solvent(i))
+  end do
+  write(20,"(a)") "#"
+  write(lineformat,*) "('#',t7,'DISTANCE      KB TOTAL',",natoms_solvent,"(tr2,i12) )"
+  write(20,lineformat) (i,i=1,natoms_solvent)
+  write(lineformat,*) "(",natoms_solvent+2,"(tr2,e12.5))"
+  do i = 1, nbins
+    write(20,lineformat) shellradius(i,binstep), kb(i), (kb_atom(j,i),j=1,natoms_solvent)
   end do
   close(20)
 
@@ -1203,8 +1241,8 @@ program g_solute_solvent
   write(*,*)
   write(*,*) ' OUTPUT FILES: ' 
   write(*,*)
-  write(*,*) ' Wrote GSS output file: ', trim(adjustl(output))
   write(*,*) ' Wrote atomic GSS to file: ', trim(adjustl(output_atom_gss)) 
+  write(*,*) ' Wrote atomic KB to file: ', trim(adjustl(output_atom_kb)) 
   write(*,*) ' Wrote atomic gamma to file: ', trim(adjustl(output_atom_gamma))
   write(*,*) ' Wrote atomic phi to file: ', trim(adjustl(output_atom_phi))
   write(*,*) ' Wrote atomic contributions to file: ', trim(adjustl(output_atom_contrib))
