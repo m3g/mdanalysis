@@ -71,7 +71,7 @@ program g_solute_solvent
           time0, etime, tarray(2),&
           binstep, &
           cutoff,  kbintsphere, bulkdensity_at_frame
-  real :: bulkdensity, totalvolume, bulkvolume, simdensity, solutevolume
+  real :: bulkdensity, totalvolume, bulkvolume, simdensity, solutevolume, av_totalvolume
   real :: bulkerror, sdbulkerror
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
@@ -96,7 +96,7 @@ program g_solute_solvent
   integer, allocatable :: imind(:)
 
   ! Shell volume, estimated from atom count
-  real, allocatable :: shellvolume(:), shellvolume_md(:)
+  real, allocatable :: shellvolume(:)
 
   ! These are the global (whole-solvent-molecule) counts of minimum-distances
   real, allocatable :: site_count(:)
@@ -330,7 +330,7 @@ program g_solute_solvent
 
   allocate( gss(nbins), kb(nbins), &
             site_count(nbins), site_count_random(nbins), shellvolume(nbins), &
-            site_count_at_frame(nbins), shellvolume_md(nbins) )
+            site_count_at_frame(nbins) )
   
   ! Check for simple input errors
   
@@ -489,7 +489,6 @@ program g_solute_solvent
   ! The number of random molecules for numerical normalization 
 
   nrsolvent_random = nintegral*nrsolvent
-  density_fix = float(nrsolvent)/nrsolvent_random
   natsolvent_random = natoms_solvent*nrsolvent_random
 
   ! Initialization of the smalldistances routine arrays
@@ -574,7 +573,6 @@ program g_solute_solvent
     site_count(i) = 0.e0
     site_count_random(i) = 0.e0
     shellvolume(i) = 0.e0
-    shellvolume_md(i) = 0.e0
     do j = 1, natoms_solvent
       gss_atom_contribution(j,i) = 0.e0
       gss_atom_contribution_random(j,i) = 0.e0
@@ -584,6 +582,7 @@ program g_solute_solvent
   end do
   bulkdensity = 0.e0
   simdensity = 0.e0
+  av_totalvolume = 0.e0
 
   ! Reading dcd file and computing the gss function
    
@@ -737,6 +736,7 @@ program g_solute_solvent
       ! Total volume of the box at this frame
 
       totalvolume = axis(1)*axis(2)*axis(3)
+      av_totalvolume = av_totalvolume + totalvolume
 
       ! This is the average density of the solvent in the simulation box, that will
       ! be averaged at the end 
@@ -861,7 +861,6 @@ program g_solute_solvent
         irad = int(float(nbins)*mind_mol(i)/cutoff)+1
         if ( irad <= nbins ) then
           site_count_random(irad) = site_count_random(irad) + 1.e0
-          shellvolume_md(irad) = shellvolume_md(irad) + 1.d0
           if ( imind(i) > 0 ) then
             gss_atom_contribution_random(imind(i),irad) = gss_atom_contribution_random(imind(i),irad) + 1.e0
           end if
@@ -936,14 +935,15 @@ program g_solute_solvent
 
   bulkdensity = bulkdensity / frames
   simdensity = simdensity / frames
+  av_totalvolume = av_totalvolume / frames
+  density_fix = (bulkdensity*av_totalvolume)/nrsolvent_random
   do i = 1, nbins
 
     ! GSS distributions
 
     site_count(i) = site_count(i)/frames
     site_count_random(i) = density_fix*site_count_random(i)/frames
-    shellvolume_md(i) = ((shellvolume_md(i)/nrsolvent_random)*totalvolume)/frames
-    shellvolume(i) = ((shellvolume(i)/nrsolvent_random)*totalvolume)/frames
+    shellvolume(i) = ((shellvolume(i)/nrsolvent_random)*av_totalvolume)/frames
 
     if ( site_count_random(i) > 0.e0 ) then
       gss(i) = site_count(i)/site_count_random(i)
@@ -1093,12 +1093,12 @@ program g_solute_solvent
 
     do j = i, nbins
       if ( site_count_random(i) > 0.e0 ) then
-        kb(j) = kb(j) + convert*((site_count(i)-site_count_random(i))/site_count_random(i))*shellvolume_md(i) 
+        kb(j) = kb(j) + convert*(1.e0/bulkdensity)*(site_count(i)-site_count_random(i))
       end if
       do k = 1, natoms_solvent
         if ( site_count_atom_random(k,i) > 0.e0 ) then
           kb_atom(k,j) = kb_atom(k,j) &
-                       + convert*((site_count_atom(k,i)-site_count_atom_random(k,i))/site_count_atom_random(k,i))*shellvolume(i)
+                       + convert*(1.e0/bulkdensity)*(site_count_atom(k,i)-site_count_atom_random(k,i))
         end if
       end do
     end do
@@ -1108,7 +1108,7 @@ program g_solute_solvent
                   convert*(site_count(i)/(bulkdensity*sphericalshellvolume(i,binstep))-1.e0)*sphericalshellvolume(i,binstep)
 
     ! Distance transformation
-    rshift = sphereradiusfromshellvolume(shellvolume_md(i),binstep)
+    rshift = sphereradiusfromshellvolume(shellvolume(i),binstep)
 
     lineformat = "(10(tr2,f12.7))"
     if ( abs(kb(i)) > 999.e0 .or. abs(kbintsphere) > 999.e0 ) then
