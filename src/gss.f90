@@ -80,7 +80,7 @@ program g_solute_solvent
                         dcdfile, inputfile, psffile, file,&
                         lineformat
   character(len=200) :: output, output_atom_phi,  &
-                        output_atom_kb, output_atom_contrib
+                        output_atom_kb, output_atom_gss_contrib, output_atom_phi_contrib
   character(len=4) :: dummyc
   logical :: readfromdcd, dcdaxis, periodic, onscreenprogress
   real :: shellradius, rshift
@@ -101,11 +101,15 @@ program g_solute_solvent
   real, allocatable :: shellvolume(:)
 
   ! These are the global (whole-solvent-molecule) counts of minimum-distances
-  real, allocatable :: site_count(:)
-  real, allocatable :: site_count_random(:)
+  real, allocatable :: md_count(:)
+  real, allocatable :: md_count_random(:)
+  real, allocatable :: md_atom_contribution(:,:)
 
-  ! This is the resulting phi (site_count/site_count_random)
+  ! This is the resulting phi (md_count/md_count_random)
   real, allocatable :: phi(:) 
+
+  ! This is the resulting gss (md_count/bulkdensity)
+  real, allocatable :: gss(:), gss_phantom(:)
 
   ! KB integral 
   real, allocatable :: kb(:)
@@ -115,8 +119,11 @@ program g_solute_solvent
   real, allocatable :: site_count_atom_random(:,:)
   real, allocatable :: phi_atom(:,:), kb_atom(:,:)
 
-  ! These are to compute the atomic contributions to the phi 
+  ! This is to compute the atomic contributions to phi (md_atom_contribution/md_count_random)
   real, allocatable :: phi_atom_contribution(:,:)
+
+  ! This is to compute the atomic contributions to gss (md_atom_contribution/bulkdensity)
+  real, allocatable :: gss_atom_contribution(:,:)
 
   ! Data read from the psf file, not necessarily used here
   real, allocatable :: eps(:), sig(:), q(:), e(:), s(:), mass(:)
@@ -269,9 +276,10 @@ program g_solute_solvent
     stop
   end if
 
-  ! Names of atomic output files
+  ! Names of auxiliary output files
   
-  output_atom_contrib = output(1:length(remove_extension(output)))//"-PHI_ATOM_CONTRIB."//file_extension(output)
+  output_atom_gss_contrib = output(1:length(remove_extension(output)))//"-GSS_ATOM_CONTRIB."//file_extension(output)
+  output_atom_phi_contrib = output(1:length(remove_extension(output)))//"-PHI_ATOM_CONTRIB."//file_extension(output)
   output_atom_phi = output(1:length(remove_extension(output)))//"-PHI_PERATOM."//file_extension(output)
   output_atom_kb = output(1:length(remove_extension(output)))//"-KB_PERATOM."//file_extension(output)
 
@@ -328,7 +336,8 @@ program g_solute_solvent
   ! Allocate phi array according to nbins
 
   allocate( phi(nbins), kb(nbins), &
-            site_count(nbins), site_count_random(nbins), shellvolume(nbins) )
+            gss(nbins), gss_phantom(nbins), &
+            md_count(nbins), md_count_random(nbins), shellvolume(nbins) )
   
   ! Check for simple input errors
   
@@ -491,11 +500,13 @@ program g_solute_solvent
   allocate( solvent_molecule(natoms_solvent,3), &
             xref(natoms_solvent), yref(natoms_solvent), zref(natoms_solvent),&
             xrnd(natoms_solvent), yrnd(natoms_solvent), zrnd(natoms_solvent) )
-  allocate( phi_atom_contribution(natoms_solvent,nbins) )
   allocate( site_count_atom(natoms_solvent,nbins), &
             site_count_atom_random(natoms_solvent,nbins), &
             kb_atom(natoms_solvent,nbins), &
             phi_atom(natoms_solvent,nbins) )
+  allocate( phi_atom_contribution(natoms_solvent,nbins), & 
+            gss_atom_contribution(natoms_solvent,nbins), &
+            md_atom_contribution(natoms_solvent,nbins) )
 
   ! These will contain indexes for the atoms of the randomly generated solvent molecules,
   ! which are more than the number of the atoms of the solvent in the actual
@@ -550,11 +561,11 @@ program g_solute_solvent
   ! Reseting the counters
   
   do i = 1, nbins
-    site_count(i) = 0.e0
-    site_count_random(i) = 0.e0
+    md_count(i) = 0.e0
+    md_count_random(i) = 0.e0
     shellvolume(i) = 0.e0
     do j = 1, natoms_solvent
-      phi_atom_contribution(j,i) = 0.e0
+      md_atom_contribution(j,i) = 0.e0
       site_count_atom(j,i) = 0.e0
       site_count_atom_random(j,i) = 0.e0
     end do
@@ -691,9 +702,9 @@ program g_solute_solvent
       do i = 1, nrsolvent
         irad = int(float(nbins)*mind_mol(i)/cutoff)+1
         if( irad <= nbins ) then
-          site_count(irad) = site_count(irad) + 1.e0
+          md_count(irad) = md_count(irad) + 1.e0
           if ( imind(i) > 0 ) then
-            phi_atom_contribution(imind(i),irad) = phi_atom_contribution(imind(i),irad) + 1.e0
+            md_atom_contribution(imind(i),irad) = md_atom_contribution(imind(i),irad) + 1.e0
           end if
         end if
       end do
@@ -842,7 +853,7 @@ program g_solute_solvent
       do i = 1, nrsolvent_random
         irad = int(float(nbins)*mind_mol(i)/cutoff)+1
         if ( irad <= nbins ) then
-          site_count_random(irad) = site_count_random(irad) + 1.e0
+          md_count_random(irad) = md_count_random(irad) + 1.e0
         end if
       end do
 
@@ -932,22 +943,39 @@ program g_solute_solvent
    
   do i = 1, nbins
 
-    ! PHI distributions
-
-    site_count(i) = site_count(i)/frames
-    site_count_random(i) = density_fix*site_count_random(i)/frames
+    md_count(i) = md_count(i)/frames
+    md_count_random(i) = density_fix*md_count_random(i)/frames
+    do j = 1, natoms_solvent
+      md_atom_contribution(j,i) = md_atom_contribution(j,i)/frames
+    end do
     shellvolume(i) = ((shellvolume(i)/nrsolvent_random)*av_totalvolume)/frames
 
-    if ( site_count_random(i) > 0.e0 ) then
-      phi(i) = site_count(i)/site_count_random(i)
+    ! PHI distributions
+
+    if ( md_count_random(i) > 0.e0 ) then
+      phi(i) = md_count(i)/md_count_random(i)
       do j = 1, natoms_solvent
-        phi_atom_contribution(j,i) = phi_atom_contribution(j,i)/frames  
-        phi_atom_contribution(j,i) = phi_atom_contribution(j,i)/site_count_random(i)
+        phi_atom_contribution(j,i) = phi_atom_contribution(j,i)/md_count_random(i)
       end do
     else
       phi(i) = 0.e0
       do j = 1, natoms_solvent
         phi_atom_contribution(j,i) = 0.e0
+      end do
+    end if
+
+    ! GSS distributions
+
+    if ( shellvolume(i) > 0.e0 ) then
+      gss(i) = md_count(i)/(bulkdensity*shellvolume(i))
+      gss_phantom(i) = md_count_random(i)/(bulkdensity*shellvolume(i))
+      do j = 1, natoms_solvent
+        gss_atom_contribution(j,i) = md_atom_contribution(j,i)/(bulkdensity*shellvolume(i))
+      end do
+    else 
+      gss(i) = 0.e0
+      do j = 1, natoms_solvent
+        gss_atom_contribution(j,i) = 0.e0
       end do
     end if
 
@@ -1023,18 +1051,20 @@ program g_solute_solvent
 
   write(20,"( '# COLUMNS CORRESPOND TO: ',/,&
   &'#       1  Minimum distance to solute (dmin)',/,&
-  &'#       2  PHI distribution, normalized by ideal gas distribution. ',/,&
-  &'#       3  Site count for each dmin (PHI without normalization).',/,&
-  &'#       4  Site count for ideal gas distribution.',/,&
-  &'#       5  Shell volume associated with each dmin. ',/,&
-  &'#       6  Spherical shell volume with radius dmin. ',/,&
-  &'#       7  PHI normalized with spherical shell volume. ',/,&
-  &'#       8  Kirwood-Buff integral (cc/mol) computed from column 2. ',/,&
-  &'#       9  Kirwood-Buff integral (cc/mol) computed from column 2 with spherical shell volume (int 4*pi*r^2*(gss-1) dr ',/,&
-  &'#      10  Spherical-shifted minimum distance ')")
+  &'#       2  PHI distribution, normalized by phantom-solute distribution. ',/,&
+  &'#       3  GSS distribution, normalized by bulk density ',/,&
+  &'#       4  GSS PHANTOM distribution, normalized by bulk density ',/,&
+  &'#       5  Site count for each dmin (PHI without normalization).',/,&
+  &'#       6  Site count for ideal gas distribution.',/,&
+  &'#       7  Shell volume associated with each dmin. ',/,&
+  &'#       8  Spherical shell volume with radius dmin. ',/,&
+  &'#       9  PHI normalized with spherical shell volume. ',/,&
+  &'#      10  Kirwood-Buff integral (cc/mol) computed from columns 3 and 4. ',/,&
+  &'#      11  Kirwood-Buff integral (cc/mol) computed from column 3 with spherical shell volume (int 4*pi*r^2*(gss-1) dr ',/,&
+  &'#      12  Spherical-shifted minimum distance ')")
   write(20,"('#')")
-  write(20,"('#   1-DISTANCE         2-PHI  3-SITE COUNT  4-COUNT RAND   5-SHELL VOL  6-SPHERE VOL  7-PHI/SPHERE      8-KB INT&
-            &   9-KB SPHERE     10-RSHIFT')")
+  write(20,"('#   1-DISTANCE         2-PHI         3-GSS 4-GSS PHANTOM  5-SITE COUNT  6-COUNT RAND&
+            &   7-SHELL VOL  8-SPHERE VOL  9-PHI/SPHERE     10-KB INT  11-KB SPHERE     12-RSHIFT')")
 
   do i = 1, nbins
     kb(i) = 0.e0
@@ -1048,8 +1078,8 @@ program g_solute_solvent
     ! KB integrals 
 
     do j = i, nbins
-      if ( site_count_random(i) > 0.e0 ) then
-        kb(j) = kb(j) + convert*(1.e0/bulkdensity)*(site_count(i)-site_count_random(i))
+      if ( md_count_random(i) > 0.e0 ) then
+        kb(j) = kb(j) + convert*(1.e0/bulkdensity)*(md_count(i)-md_count_random(i))
       end if
       do k = 1, natoms_solvent
         if ( site_count_atom_random(k,i) > 0.e0 ) then
@@ -1061,34 +1091,59 @@ program g_solute_solvent
 
     ! KB integral using spherical shell volume 
     kbintsphere = kbintsphere + &
-                  convert*(site_count(i)/(bulkdensity*sphericalshellvolume(i,binstep))-1.e0)*sphericalshellvolume(i,binstep)
+                  convert*(md_count(i)/(bulkdensity*sphericalshellvolume(i,binstep))-1.e0)*sphericalshellvolume(i,binstep)
 
     ! Distance transformation
     rshift = sphereradiusfromshellvolume(shellvolume(i),binstep)
 
-    lineformat = "(10(tr2,f12.7))"
+    lineformat = "(12(tr2,f12.7))"
     if ( abs(kb(i)) > 999.e0 .or. abs(kbintsphere) > 999.e0 ) then
-      lineformat = "(7(tr2,f12.7),2(tr2,e12.5),(tr2,f12.7))"
+      lineformat = "(9(tr2,f12.7),2(tr2,e12.5),(tr2,f12.7))"
     end if
 
     write(20,lineformat) &
     shellradius(i,binstep),&                                      !  1-DISTANCE
     phi(i),&                                                      !  2-PHI
-    site_count(i),&                                               !  3-SITE COUNT
-    site_count_random(i),&                                        !  4-COUNT RAND
-    shellvolume(i),&                                              !  5-SHELL VOL
-    sphericalshellvolume(i,binstep),&                             !  6-SPHER VOL
-    site_count(i)/(bulkdensity*sphericalshellvolume(i,binstep)),& !  7-PHI/SPHER
-    kb(i),&                                                       !  8-KB INT
-    kbintsphere,&                                                 !  9-KB SPHER
-    rshift                                                        ! 10-RSHIFT
+    gss(i),&                                                      !  3-GSS
+    gss_phantom(i),&                                              !  4-GSS PHANTOM
+    md_count(i),&                                                 !  5-SITE COUNT
+    md_count_random(i),&                                          !  6-COUNT RAND
+    shellvolume(i),&                                              !  7-SHELL VOL
+    sphericalshellvolume(i,binstep),&                             !  8-SPHER VOL
+    md_count(i)/(bulkdensity*sphericalshellvolume(i,binstep)),&   !  9-PHI/SPHER
+    kb(i),&                                                       ! 10-KB INT
+    kbintsphere,&                                                 ! 11-KB SPHER
+    rshift                                                        ! 12-RSHIFT
 
+  end do
+  close(20)
+
+  ! Writting gss per atom contributions 
+
+  open(20,file=output_atom_gss_contrib)
+  write(20,"(a)") "# Total GSS contribution per atom. "
+  write(20,"( '#',/,&
+             &'# Input file: ',a,/,& 
+             &'# DCD file: ',a,/,& 
+             &'# Group file: ',a,/,&
+             &'# PSF file: ' )")
+  write(20,"(a)") "#"
+  write(20,"(a)") "# Atoms: "
+  do i = 1, natoms_solvent
+    write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solvent(i)), classat(solvent(i)), mass(solvent(i))
+  end do
+  write(20,"(a)") "#"
+  write(lineformat,*) "('#',t7,'DISTANCE     GSS TOTAL',",natoms_solvent,"(tr2,i12) )"
+  write(20,lineformat) (i,i=1,natoms_solvent)
+  write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
+  do i = 1, nbins
+    write(20,lineformat) shellradius(i,binstep), gss(i), (gss_atom_contribution(j,i),j=1,natoms_solvent)
   end do
   close(20)
 
   ! Writting phi per atom contributions 
 
-  open(20,file=output_atom_contrib)
+  open(20,file=output_atom_phi_contrib)
   write(20,"(a)") "# Total PHI contribution per atom. "
   write(20,"( '#',/,&
              &'# Input file: ',a,/,& 
@@ -1165,8 +1220,10 @@ program g_solute_solvent
   write(*,*)
   write(*,*) ' Wrote atomic PHI to file: ', trim(adjustl(output_atom_phi)) 
   write(*,*) ' Wrote atomic KB to file: ', trim(adjustl(output_atom_kb)) 
-  write(*,*) ' Wrote atomic contributions to file: ', trim(adjustl(output_atom_contrib))
-  write(*,*) ' Wrote PHI output file: ', trim(adjustl(output))
+  write(*,*) ' Wrote atomic GSS contributions to file: ', trim(adjustl(output_atom_gss_contrib))
+  write(*,*) ' Wrote atomic PHI contributions to file: ', trim(adjustl(output_atom_phi_contrib))
+  write(*,*)
+  write(*,*) ' Wrote main output file: ', trim(adjustl(output))
   write(*,*)
   write(*,*) ' Running time: ', time0
   write(*,*) '####################################################'
