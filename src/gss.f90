@@ -937,6 +937,20 @@ program g_solute_solvent
   simdensity = simdensity / frames
   av_totalvolume = av_totalvolume / frames
   density_fix = (bulkdensity*av_totalvolume)/nrsolvent_random
+
+  write(*,*)
+  write(*,"(a,f12.5)") '  Solvent density in simulation box (sites/A^3): ', simdensity
+  write(*,"(a,f12.5)") '  Estimated bulk solvent density (sites/A^3): ', bulkdensity
+  write(*,*)
+  write(*,"(a,f12.5)") '  Molar volume of solvent in simulation box (cc/mol): ', convert/simdensity
+  write(*,"(a,f12.5)") '  Molar volume of solvent in bulk (cc/mol): ', convert/bulkdensity
+  write(*,*)
+  write(*,"(a,f12.5)") '  Density scaling factor for numerical integration: ', density_fix
+
+  solutevolume = convert*(bulkdensity*av_totalvolume - nrsolvent)/bulkdensity
+  write(*,*)
+  write(*,"(a,f12.5)") '  Solute partial volume (cc/mol): ', solutevolume
+   
   do i = 1, nbins
 
     ! GSS distributions
@@ -996,17 +1010,6 @@ program g_solute_solvent
     end do
 
   end do
-
-  write(*,*)
-  write(*,"(a,f12.5)") '  Solvent density in simulation box (sites/A^3): ', simdensity
-  write(*,"(a,f12.5)") '  Estimated bulk solvent density (sites/A^3): ', bulkdensity
-  write(*,*)
-  write(*,"(a,f12.5)") '  Molar volume of solvent simulation box (cc/mol): ', convert/simdensity
-  write(*,"(a,f12.5)") '  Molar volume of solvent in bulk (cc/mol): ', convert/bulkdensity
-
-  solutevolume = convert*nrsolvent*(1.e0/simdensity-1e0/bulkdensity)
-  write(*,*)
-  write(*,"(a,f12.5)") '  Solute partial volume (cc/mol): ', solutevolume
 
   ! Open output file and writes all information of this run
 
