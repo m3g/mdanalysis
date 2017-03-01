@@ -955,7 +955,7 @@ program g_solute_solvent
     if ( md_count_random(i) > 0.e0 ) then
       phi(i) = md_count(i)/md_count_random(i)
       do j = 1, natoms_solvent
-        phi_atom_contribution(j,i) = phi_atom_contribution(j,i)/md_count_random(i)
+        phi_atom_contribution(j,i) = md_atom_contribution(j,i)/md_count_random(i)
       end do
     else
       phi(i) = 0.e0
