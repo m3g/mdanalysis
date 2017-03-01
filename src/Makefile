@@ -45,9 +45,7 @@ all : $(BIN) \
       $(BIN)/align \
       $(BIN)/distance \
       $(BIN)/solvation \
-      $(BIN)/gss_maxmin \
       $(BIN)/gss \
-      $(BIN)/gmd \
       $(BIN)/angles \
       $(BIN)/hbonds \
       $(BIN)/globalstructure \
@@ -57,7 +55,6 @@ all : $(BIN) \
       $(BIN)/histogram \
       $(BIN)/perresidueavg \
       $(BIN)/lifetime \
-      $(BIN)/gssfree \
       $(BIN)/data_average \
       warning
 
@@ -120,20 +117,6 @@ $(BIN)/solvation.sh : $(SCR)/solvation-base.sh
 	chmod +x $(BIN)/solvation.sh
 
 #
-# gmd module
-#
-
-$(BIN)/gmd : $(OBJ)/smalldistances.o $(OBJ)/common.o $(OBJ)/gmd.o $(BIN)/gmd.sh
-	$(FORTRAN) $(FLAGS) -o $(BIN)/gmd $(OBJ)/gmd.o $(OBJ)/common.o $(OBJ)/smalldistances.o
-
-$(OBJ)/gmd.o : $(SRC)/gmd.f90
-	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/gmd.o $(SRC)/gmd.f90
-
-$(BIN)/gmd.sh : $(SCR)/gmd-base.sh
-	sed 's!PWD!$(IDIR)!' $(SCR)/gmd-base.sh > $(BIN)/gmd.sh
-	chmod +x $(BIN)/gmd.sh
-
-#
 # gss module
 #
 
@@ -150,19 +133,6 @@ $(BIN)/gss.sh : $(SCR)/gss-base.sh
 $(OBJ)/smalldistances.o : $(SRC)/smalldistances.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/smalldistances.o $(SRC)/smalldistances.f90
 
-#
-# gss_maxmin module
-#
-
-$(BIN)/gss_maxmin : $(OBJ)/common.o $(OBJ)/gss_maxmin.o $(BIN)/gss_maxmin.sh
-	$(FORTRAN) $(FLAGS) -o $(BIN)/gss_maxmin $(OBJ)/gss_maxmin.o $(OBJ)/common.o
-
-$(OBJ)/gss_maxmin.o : $(SRC)/gss_maxmin.f90
-	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/gss_maxmin.o $(SRC)/gss_maxmin.f90
-
-$(BIN)/gss_maxmin.sh : $(SCR)/gss_maxmin-base.sh
-	sed 's!PWD!$(IDIR)!' $(SCR)/gss_maxmin-base.sh > $(BIN)/gss_maxmin.sh
-	chmod +x $(BIN)/gss_maxmin.sh
 
 #
 # angles module
@@ -269,15 +239,6 @@ $(BIN)/lifetime : $(OBJ)/lifetime.o
 $(OBJ)/lifetime.o : $(SRC)/lifetime.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/lifetime.o $(SRC)/lifetime.f90
 
-#
-# gssfree program
-# 
-
-$(BIN)/gssfree : $(OBJ)/gssfree.o $(OBJ)/common.o
-	$(FORTRAN) $(FLAGS) -o $(BIN)/gssfree $(OBJ)/gssfree.o $(OBJ)/common.o
-
-$(OBJ)/gssfree.o : $(SRC)/gssfree.f90
-	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/gssfree.o $(SRC)/gssfree.f90
 
 #
 # data_average program
