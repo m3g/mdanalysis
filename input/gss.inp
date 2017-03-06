@@ -40,7 +40,7 @@ dbulk 16.
 # binstep: The width of the histogram. It will not affect results, but
 # it may affect the smoothness of the plots. Greater bins, greater smoothness,
 # but the details are lost.
-binstep 0.1
+binstep 0.02
 
 # nint: An integer parameter controling the precision of the numerical volume
 # integration. The greater nint, the greater the precision (but at a cost
