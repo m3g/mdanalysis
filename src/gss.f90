@@ -73,7 +73,7 @@ program g_solute_solvent
   real :: side(memory,3), mass1, mass2, random, axis(3)
   real :: dummyr, xdcd(memory), ydcd(memory), zdcd(memory),&
           time0, etime, tarray(2),&
-          binstep, cutoff,  kbintsphere, bulkdensity_at_frame
+          binstep, kbintsphere, bulkdensity_at_frame
   real :: bulkdensity, totalvolume, bulkvolume, simdensity, solutevolume, av_totalvolume
   real :: bulkerror, sdbulkerror
   character(len=200) :: groupfile, line, record, value, keyword,&
@@ -168,7 +168,6 @@ program g_solute_solvent
   nbins = 1000
   nintegral = 10
   dbulk = 12.
-  cutoff = 14.
   binstep = 0.1e0
   onscreenprogress = .false.
 
@@ -224,10 +223,6 @@ program g_solute_solvent
     else if(keyword(record) == 'nint') then
       line = value(record)
       read(line,*,iostat=keystatus) nintegral
-      if(keystatus /= 0) exit 
-    else if(keyword(record) == 'cutoff') then
-      line = value(record)
-      read(line,*,iostat=keystatus) cutoff
       if(keystatus /= 0) exit 
     else if(keyword(record) == 'dbulk') then
       line = value(record)
@@ -311,24 +306,14 @@ program g_solute_solvent
 
   convert = mole / 1.e24
 
-  ! compute ibulk from dbulk (distance from which the solvent is considered bulk,
-  ! in the estimation of bulk density)
+  ! Check compatibility of dbulk and binstep
 
-  if ( dbulk >= cutoff ) then
-    write(*,*) ' ERROR: The bulk volume is zero (dbulk >= cutoff). '
-    stop
-  end if
   if ( dbulk-int(dbulk/binstep)*binstep > 1.e-5 ) then
     write(*,*) ' ERROR: dbulk must be a multiple of binstep. '  
     stop
   end if
-  if ( (cutoff-dbulk)-int((cutoff-dbulk)/binstep)*binstep > 1.e-5 ) then
-    write(*,*) ' ERROR: (cutoff-dbulk) must be a multiple of binstep. '  
-    stop
-  end if
 
-  nbins = int(cutoff/binstep)
-  ibulk = int(dbulk/binstep) + 1
+  nbins = int(dbulk/binstep)
 
   write(*,*) ' Width of histogram bins: ', binstep
   write(*,*) ' Number of bins of histograms: ', nbins
@@ -359,7 +344,6 @@ program g_solute_solvent
     write(*,*) ' Last frame to be considered: ', lastframe
   end if
   write(*,*) ' Stride (will jump frames): ', stride
-  write(*,*) ' Cutoff for linked cells: ', cutoff
   write(*,*) ' Bulk distance: ', dbulk
   write(*,*) ' Multiplying factor for random count: ', nintegral
   
@@ -630,11 +614,11 @@ program g_solute_solvent
       axis(2) = side(kframe,2) 
       axis(3) = side(kframe,3) 
 
-      if ( cutoff > axis(1)/2.e0 .or. &
-           cutoff  > axis(2)/2.e0 .or. &
-           cutoff > axis(3)/2.d0 ) then
+      if ( dbulk > axis(1)/2.e0 .or. &
+           dbulk > axis(2)/2.e0 .or. &
+           dbulk > axis(3)/2.d0 ) then
         write(*,*)
-        write(*,*) " ERROR: cutoff > periodic_dimension/2 "
+        write(*,*) " ERROR: dbulk > periodic_dimension/2 "
         stop
       end if
 
@@ -655,12 +639,12 @@ program g_solute_solvent
         z(solvent(i)) = zdcd(ii)
       end do
 
-      ! Compute all distances that are smaller than the cutoff
+      ! Compute all distances that are smaller than dbulk
 
       memerror = .true.
       do while ( memerror ) 
         memerror = .false.
-        call smalldistances(nsolute,solute,nsolvent,solvent,x,y,z,cutoff,&
+        call smalldistances(nsolute,solute,nsolvent,solvent,x,y,z,dbulk,&
                             nsmalld,ismalld,dsmalld,axis,maxsmalld,memerror)
         if ( memerror ) then
           deallocate( ismalld, dsmalld )
@@ -676,11 +660,11 @@ program g_solute_solvent
       ! For each solvent residue, get the MINIMUM distance to the solute
     
       do i = 1, nrsolvent
-        mind_mol(i) = cutoff + 1.e0
+        mind_mol(i) = dbulk + 1.e0
         imind(i) = 0
       end do
       do i = 1, nsolvent
-        mind_atom(i) = cutoff + 1.e0
+        mind_atom(i) = dbulk + 1.e0
       end do
       do i = 1, nsmalld
         ! Counting for computing the whole-molecule phi 
@@ -700,7 +684,7 @@ program g_solute_solvent
       ! Summing up current data to the phi histogram
 
       do i = 1, nrsolvent
-        irad = int(float(nbins)*mind_mol(i)/cutoff)+1
+        irad = int(float(nbins)*mind_mol(i)/dbulk)+1
         if( irad <= nbins ) then
           md_count(irad) = md_count(irad) + 1.e0
           if ( imind(i) > 0 ) then
@@ -714,7 +698,7 @@ program g_solute_solvent
 
       notbulk = 0
       do i = 1, nsolvent
-        irad = int(float(nbins)*mind_atom(i)/cutoff)+1
+        irad = int(float(nbins)*mind_atom(i)/dbulk)+1
         if( irad <= nbins ) then
           j = mod(i,natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
@@ -822,7 +806,7 @@ program g_solute_solvent
       memerror = .true.
       do while ( memerror ) 
         memerror = .false.
-        call smalldistances(nsolute,solute2,natsolvent_random,solvent_random,x,y,z,cutoff,&
+        call smalldistances(nsolute,solute2,natsolvent_random,solvent_random,x,y,z,dbulk,&
                             nsmalld,ismalld,dsmalld,axis,maxsmalld,memerror)
         if ( memerror ) then
           deallocate( ismalld, dsmalld )
@@ -835,7 +819,7 @@ program g_solute_solvent
       ! in each region
 
       do i = 1, nrsolvent_random
-        mind_mol(i) = cutoff + 1.e0
+        mind_mol(i) = dbulk + 1.e0
         imind(i) = 0
       end do
       do i = 1, nsmalld
@@ -852,7 +836,7 @@ program g_solute_solvent
       ! rescaled for the correct density
 
       do i = 1, nrsolvent_random
-        irad = int(float(nbins)*mind_mol(i)/cutoff)+1
+        irad = int(float(nbins)*mind_mol(i)/dbulk)+1
         if ( irad <= nbins ) then
           md_count_random(irad) = md_count_random(irad) + 1.e0
         end if
@@ -861,7 +845,7 @@ program g_solute_solvent
       ! Accumulate site count for each atom
 
       do i = 1, natsolvent_random
-        mind_atom(i) = cutoff + 1.e0
+        mind_atom(i) = dbulk + 1.e0
       end do
       do i = 1, nsmalld
         if ( dsmalld(i) < mind_atom(ismalld(i)) ) then
@@ -870,7 +854,7 @@ program g_solute_solvent
       end do
       notbulk = 0
       do i = 1, natsolvent_random
-        irad = int(float(nbins)*mind_atom(i)/cutoff)+1
+        irad = int(float(nbins)*mind_atom(i)/dbulk)+1
         if ( irad <= nbins ) then
           j = mod(i,natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
@@ -1035,6 +1019,9 @@ program g_solute_solvent
              &nsolute, mass1, solute(1), solute(nsolute),& 
              &nsolvent, mass2, solvent(1), solvent(nsolvent)  
 
+  ! Check the error of the last Angstrom of the computed gss relative to bulk density
+
+  ibulk = int((dbulk-1.e0)/binstep) + 1
   bulkerror = 0.e0
   do i = ibulk, nbins
     bulkerror = bulkerror + phi(i)
@@ -1045,9 +1032,9 @@ program g_solute_solvent
   end do
   sdbulkerror = sqrt(sdbulkerror/(nbins-ibulk+1))
   write(*,*)
-  write(*,"('  Average and standard deviation of bulk-phi: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
+  write(*,"('  Average and standard deviation long-range bulk-phi: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
   write(20,"('#')")
-  write(20,"('# Average and standard deviation of bulk-phi: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
+  write(20,"('# Average and standard deviation of long-range bulk-phi: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
 
   ! Output table
 
