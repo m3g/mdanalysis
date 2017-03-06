@@ -67,7 +67,7 @@ program g_solute_solvent
   integer :: maxsmalld
   logical :: memerror
   real :: dbulk, density_fix
-  integer :: nbulk, ibulk, nintegral, nbulk_random
+  integer :: nbulk, ibulk, nintegral, nbulk_random, notbulk
   real :: convert
   double precision :: readsidesx, readsidesy, readsidesz, t
   real :: side(memory,3), mass1, mass2, random, axis(3)
@@ -712,16 +712,17 @@ program g_solute_solvent
       ! Site count at frame, to estimate the bulk density, is performed for a
       ! single solvent reference site, which is taken as atom of type 1 of the solvent
 
-      nbulk = 0
+      notbulk = 0
       do i = 1, nsolvent
         irad = int(float(nbins)*mind_atom(i)/cutoff)+1
         if( irad <= nbins ) then
           j = mod(i,natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
           site_count_atom(j,irad) = site_count_atom(j,irad) + 1.e0
-          if ( j == 1 .and. irad >= ibulk ) nbulk = nbulk + 1
+          if ( j == 1 ) notbulk = notbulk + 1
         end if
       end do
+      nbulk = nrsolvent - notbulk
 
       ! Total volume of the box at this frame
 
@@ -867,7 +868,7 @@ program g_solute_solvent
           mind_atom(ismalld(i)) = dsmalld(i)
         end if
       end do
-      nbulk_random = 0
+      notbulk = 0
       do i = 1, natsolvent_random
         irad = int(float(nbins)*mind_atom(i)/cutoff)+1
         if ( irad <= nbins ) then
@@ -880,11 +881,12 @@ program g_solute_solvent
 
           if ( j == 1 ) then
             shellvolume(irad) = shellvolume(irad) + 1.e0
-            if ( irad >= ibulk ) nbulk_random = nbulk_random + 1
+            notbulk = notbulk + 1
           end if
 
         end if
       end do
+      nbulk_random = nrsolvent_random - notbulk
       if ( nbulk_random == 0 ) then
         write(*,*) 
         write(*,*) ' ERROR: zero volume estimated for bulk region. Either the region is '
