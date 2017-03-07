@@ -603,6 +603,21 @@ program g_solute_solvent
     do kframe = 1, nfrcycle
       iframe = iframe + 1
 
+      ! Write progress
+
+      if ( iframe >= firstframe ) then
+        if ( onscreenprogress ) then
+          write(*,"( 7a,f6.2,'%' )",advance='no') (char(8),i=1,7), 100.*float(kframe)/nfrcycle
+        else
+          if ( mod(iframe-firstframe,max(1,(frames/1000))) == 0 .and. &
+               mod(iframe-firstframe,stride) == 0 ) then
+            write(*,"( '  Progress: ',f6.2,'%' )") 100.*float((iframe-firstframe)/stride)/frames
+          end if
+        end if
+      end if
+
+      ! Skip if stride determines so
+  
       if(mod(iframe-firstframe,stride) /= 0 .or. iframe < firstframe ) then
         iatom = iatom + ntotat
         cycle
@@ -889,16 +904,6 @@ program g_solute_solvent
       bulkdensity_at_frame = float(nbulk)/bulkvolume
       bulkdensity = bulkdensity + bulkdensity_at_frame
 
-      ! Write progress
-
-      if ( onscreenprogress ) then
-        write(*,"( 7a,f6.2,'%' )",advance='no') (char(8),i=1,7), 100.*float(kframe)/nfrcycle
-      else
-        if ( mod(iframe,max(1,(frames/1000))) == 0 ) then
-          write(*,"( '  Progress: ',f6.2,'%' )") 100.*float(iframe)/frames
-        end if
-      end if
-  
       iatom = iatom + ntotat
     end do
     write(*,*)
