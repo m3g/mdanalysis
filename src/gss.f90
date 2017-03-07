@@ -920,17 +920,17 @@ program g_solute_solvent
   density_fix = (bulkdensity*av_totalvolume)/nrsolvent_random
 
   write(*,*)
-  write(*,"(a,f12.5)") '  Solvent density in simulation box (sites/A^3): ', simdensity
-  write(*,"(a,f12.5)") '  Estimated bulk solvent density (sites/A^3): ', bulkdensity
+  write(*,"(a,e12.5)") '  Solvent density in simulation box (sites/A^3): ', simdensity
+  write(*,"(a,e12.5)") '  Estimated bulk solvent density (sites/A^3): ', bulkdensity
   write(*,*)
-  write(*,"(a,f12.5)") '  Molar volume of solvent in simulation box (cc/mol): ', convert/simdensity
-  write(*,"(a,f12.5)") '  Molar volume of solvent in bulk (cc/mol): ', convert/bulkdensity
+  write(*,"(a,e12.5)") '  Molar volume of solvent in simulation box (cc/mol): ', convert/simdensity
+  write(*,"(a,e12.5)") '  Molar volume of solvent in bulk (cc/mol): ', convert/bulkdensity
   write(*,*)
   write(*,"(a,f12.5)") '  Density scaling factor for numerical integration: ', density_fix
 
   solutevolume = convert*(bulkdensity*av_totalvolume - nrsolvent)/bulkdensity
   write(*,*)
-  write(*,"(a,f12.5)") '  Solute partial volume (cc/mol): ', solutevolume
+  write(*,"(a,e12.5)") '  Solute partial volume (cc/mol): ', solutevolume
    
   do i = 1, nbins
 
@@ -959,15 +959,16 @@ program g_solute_solvent
 
     if ( shellvolume(i) > 0.e0 ) then
       gss(i) = md_count(i)/(bulkdensity*shellvolume(i))
-      gss_phantom(i) = md_count_random(i)/(bulkdensity*shellvolume(i))
       do j = 1, natoms_solvent
         gss_atom_contribution(j,i) = md_atom_contribution(j,i)/(bulkdensity*shellvolume(i))
       end do
+      gss_phantom(i) = md_count_random(i)/(bulkdensity*shellvolume(i))
     else 
       gss(i) = 0.e0
       do j = 1, natoms_solvent
         gss_atom_contribution(j,i) = 0.e0
       end do
+      gss_phantom(i) = natoms_solvent
     end if
 
     ! Additional distribution required for computing atomic parameters
@@ -1002,12 +1003,12 @@ program g_solute_solvent
              &'# Periodic boundary conditions: ',/,&
              &'# Periodic: ',l1,' Read from DCD: ',l1,/,&
              &'#',/,&
-             &'# Density of solvent in simulation box (sites/A^3): ',f12.5,/,&
-             &'# Density of solvent in bulk (estimated) (sites/A^3): ',f12.5,/,&
-             &'# Molar volume of solvent in simulation (cc/mol): ',f12.5,/,&
-             &'# Molar volume of solvent in bulk (estimated) (cc/mol): ',f12.5,/,&
+             &'# Density of solvent in simulation box (sites/A^3): ',e12.5,/,&
+             &'# Density of solvent in bulk (estimated) (sites/A^3): ',e12.5,/,&
+             &'# Molar volume of solvent in simulation (cc/mol): ',e12.5,/,&
+             &'# Molar volume of solvent in bulk (estimated) (cc/mol): ',e12.5,/,&
              &'#',/,&
-             &'# Solute partial volume estimate (cc/mol): ',f12.5,/,&
+             &'# Solute partial volume estimate (cc/mol): ',e12.5,/,&
              &'#',/,&
              &'# Number of atoms and mass of group 1: ',i6,f12.3,/,&
              &'# First and last atoms of group 1: ',i6,tr1,i6,/,&
