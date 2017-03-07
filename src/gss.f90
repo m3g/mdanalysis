@@ -1038,8 +1038,8 @@ program g_solute_solvent
   sdbulkerror = sqrt(sdbulkerror/(nbins-ibulk+1))
   write(*,*)
   write(*,"('  Average and standard deviation long-range bulk-phi: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
-  write(20,"('#')")
   write(20,"('# Average and standard deviation of long-range bulk-phi: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
+  write(20,"('#')")
 
   ! Output table
 
