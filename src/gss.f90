@@ -60,21 +60,23 @@ program g_solute_solvent
              nframes, dummyi, ntotat, memframes, ncycles, memlast,&
              iframe, icycle, nfrcycle, iatom, &
              status, keystatus, iargc, lastatom, nres, nrsolute,&
-             nrsolvent, kframe, irad, nbins, natoms_solvent,&
+             nrsolvent, kframe, ibin, nbins, natoms_solvent,&
              nsmalld, & 
              frames
   integer :: nrsolvent_random, natsolvent_random
   integer :: maxsmalld
   logical :: memerror
-  real :: dbulk, density_fix
-  integer :: nbulk, ibulk, nintegral, nbulk_random, notbulk
+  real :: dbulk, density_fix 
+  real :: md_int, md_rand_int, volume
+  integer :: nbulk, ibulk, nint, nbulk_random, notbulk
   real :: convert
   double precision :: readsidesx, readsidesy, readsidesz, t
   real :: side(memory,3), mass1, mass2, random, axis(3)
   real :: dummyr, xdcd(memory), ydcd(memory), zdcd(memory),&
           time0, etime, tarray(2),&
-          binstep, kbintsphere, bulkdensity_at_frame
-  real :: bulkdensity, totalvolume, bulkvolume, simdensity, solutevolume, av_totalvolume
+          binstep, kbintsphere
+  real :: bulkdensity, totalvolume, bulkvolume, simdensity, solutevolume, av_totalvolume, &
+          domaindensity
   real :: bulkerror, sdbulkerror
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
@@ -156,7 +158,7 @@ program g_solute_solvent
   
   ! Seed for random number generator
   
-  call init_random_number(1811)
+  call init_random_number(654321)
   
   ! Some default parameters
   
@@ -166,7 +168,7 @@ program g_solute_solvent
   periodic = .true.
   readfromdcd = .true.
   nbins = 1000
-  nintegral = 10
+  nint = 10
   dbulk = 12.
   binstep = 0.1e0
   onscreenprogress = .false.
@@ -222,7 +224,7 @@ program g_solute_solvent
       if(keystatus /= 0) exit 
     else if(keyword(record) == 'nint') then
       line = value(record)
-      read(line,*,iostat=keystatus) nintegral
+      read(line,*,iostat=keystatus) nint
       if(keystatus /= 0) exit 
     else if(keyword(record) == 'dbulk') then
       line = value(record)
@@ -345,7 +347,7 @@ program g_solute_solvent
   end if
   write(*,*) ' Stride (will jump frames): ', stride
   write(*,*) ' Bulk distance: ', dbulk
-  write(*,*) ' Multiplying factor for random count: ', nintegral
+  write(*,*) ' Multiplying factor for random count: ', nint
   
   ! Read PSF file
   
@@ -464,7 +466,7 @@ program g_solute_solvent
   
   ! The number of random molecules for numerical normalization 
 
-  nrsolvent_random = nintegral*nrsolvent
+  nrsolvent_random = nint*nrsolvent
   natsolvent_random = natoms_solvent*nrsolvent_random
 
   ! Initialization of the smalldistances routine arrays
@@ -474,7 +476,7 @@ program g_solute_solvent
 
   ! Allocate xyz and minimum-distance count arrays
 
-  maxatom = nsolute + max(nsolvent,natsolvent_random)
+  maxatom = max(natom,nsolute+natsolvent_random)
   allocate( x(maxatom), y(maxatom), z(maxatom) )
   allocate( imind(nrsolvent_random), mind_mol(nrsolvent_random), mind_atom(natsolvent_random) )
 
@@ -554,6 +556,7 @@ program g_solute_solvent
       site_count_atom_random(j,i) = 0.e0
     end do
   end do
+  domaindensity = 0.e0
   bulkdensity = 0.e0
   simdensity = 0.e0
   av_totalvolume = 0.e0
@@ -699,11 +702,11 @@ program g_solute_solvent
       ! Summing up current data to the phi histogram
 
       do i = 1, nrsolvent
-        irad = int(float(nbins)*mind_mol(i)/dbulk)+1
-        if( irad <= nbins ) then
-          md_count(irad) = md_count(irad) + 1.e0
+        ibin = int(float(nbins)*mind_mol(i)/dbulk)+1
+        if( ibin <= nbins ) then
+          md_count(ibin) = md_count(ibin) + 1.e0
           if ( imind(i) > 0 ) then
-            md_atom_contribution(imind(i),irad) = md_atom_contribution(imind(i),irad) + 1.e0
+            md_atom_contribution(imind(i),ibin) = md_atom_contribution(imind(i),ibin) + 1.e0
           end if
         end if
       end do
@@ -713,11 +716,11 @@ program g_solute_solvent
 
       notbulk = 0
       do i = 1, nsolvent
-        irad = int(float(nbins)*mind_atom(i)/dbulk)+1
-        if( irad <= nbins ) then
+        ibin = int(float(nbins)*mind_atom(i)/dbulk)+1
+        if( ibin <= nbins ) then
           j = mod(i,natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
-          site_count_atom(j,irad) = site_count_atom(j,irad) + 1.e0
+          site_count_atom(j,ibin) = site_count_atom(j,ibin) + 1.e0
           if ( j == 1 ) notbulk = notbulk + 1
         end if
       end do
@@ -770,24 +773,12 @@ program g_solute_solvent
           solvent_molecule(i,3) = zdcd(jj+i-1)
         end do
 
-        ! Put molecule in its center of coordinates for it to be the reference coordinate for the 
-        ! random coordinates that will be generated
-  
-        cmx = 0.
-        cmy = 0.
-        cmz = 0.
+        ! Put atom 1 in the center of rotation of the molecule
+
         do i = 1, natoms_solvent
-          cmx = cmx + solvent_molecule(i,1)
-          cmy = cmy + solvent_molecule(i,2)
-          cmz = cmz + solvent_molecule(i,3)
-        end do
-        cmx = cmx / float(natoms_solvent)
-        cmy = cmy / float(natoms_solvent)
-        cmz = cmz / float(natoms_solvent)
-        do i = 1, natoms_solvent
-          xref(i) = solvent_molecule(i,1) - cmx
-          yref(i) = solvent_molecule(i,2) - cmy
-          zref(i) = solvent_molecule(i,3) - cmz
+          xref(i) = solvent_molecule(i,1) - solvent_molecule(1,1)
+          yref(i) = solvent_molecule(i,2) - solvent_molecule(1,2)
+          zref(i) = solvent_molecule(i,3) - solvent_molecule(1,3)
         end do
 
         ! Generate a random position for this molecule
@@ -848,12 +839,11 @@ program g_solute_solvent
       end do
 
       ! So lets count the sites at each bin distance for the non-interacting distribution 
-      ! rescaled for the correct density
 
       do i = 1, nrsolvent_random
-        irad = int(float(nbins)*mind_mol(i)/dbulk)+1
-        if ( irad <= nbins ) then
-          md_count_random(irad) = md_count_random(irad) + 1.e0
+        ibin = int(float(nbins)*mind_mol(i)/dbulk)+1
+        if ( ibin <= nbins ) then
+          md_count_random(ibin) = md_count_random(ibin) + 1.e0
         end if
       end do
 
@@ -869,17 +859,17 @@ program g_solute_solvent
       end do
       notbulk = 0
       do i = 1, natsolvent_random
-        irad = int(float(nbins)*mind_atom(i)/dbulk)+1
-        if ( irad <= nbins ) then
+        ibin = int(float(nbins)*mind_atom(i)/dbulk)+1
+        if ( ibin <= nbins ) then
           j = mod(i,natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
-          site_count_atom_random(j,irad) = site_count_atom_random(j,irad) + 1.e0
+          site_count_atom_random(j,ibin) = site_count_atom_random(j,ibin) + 1.e0
 
           ! The counting of single-sites at the bulk region will be used to estimate
-          ! the volumes of spherical shells of radius irad
+          ! the volumes of spherical shells of radius ibin
 
           if ( j == 1 ) then
-            shellvolume(irad) = shellvolume(irad) + 1.e0
+            shellvolume(ibin) = shellvolume(ibin) + 1.e0
             notbulk = notbulk + 1
           end if
 
@@ -901,8 +891,8 @@ program g_solute_solvent
 
       ! These are averaged at the end for final report:
 
-      bulkdensity_at_frame = float(nbulk)/bulkvolume
-      bulkdensity = bulkdensity + bulkdensity_at_frame
+      bulkdensity = bulkdensity + float(nbulk)/bulkvolume
+      domaindensity = domaindensity + float(nbulk)/bulkvolume
 
       iatom = iatom + ntotat
     end do
@@ -914,14 +904,16 @@ program g_solute_solvent
   ! Averaging results on the number of frames
   !
 
-  bulkdensity = bulkdensity / frames
   simdensity = simdensity / frames
+  bulkdensity = bulkdensity / frames
+  domaindensity = domaindensity / frames
   av_totalvolume = av_totalvolume / frames
   density_fix = (bulkdensity*av_totalvolume)/nrsolvent_random
 
   write(*,*)
   write(*,"(a,e12.5)") '  Solvent density in simulation box (sites/A^3): ', simdensity
   write(*,"(a,e12.5)") '  Estimated bulk solvent density (sites/A^3): ', bulkdensity
+  write(*,"(a,e12.5)") '  Estimated solvent density on solute domain (sites/A^3): ', domaindensity
   write(*,*)
   write(*,"(a,e12.5)") '  Molar volume of solvent in simulation box (cc/mol): ', convert/simdensity
   write(*,"(a,e12.5)") '  Molar volume of solvent in bulk (cc/mol): ', convert/bulkdensity
@@ -1025,7 +1017,7 @@ program g_solute_solvent
              &nsolute, mass1, solute(1), solute(nsolute),& 
              &nsolvent, mass2, solvent(1), solvent(nsolvent)  
 
-  ! Check the error of the last Angstrom of the computed gss relative to bulk density
+  ! Check the error of the last Angstrom of the computed phi relative to bulk density
 
   ibulk = int((dbulk-1.e0)/binstep) + 1
   bulkerror = 0.e0
@@ -1039,7 +1031,23 @@ program g_solute_solvent
   sdbulkerror = sqrt(sdbulkerror/(nbins-ibulk+1))
   write(*,*)
   write(*,"('  Average and standard deviation long-range bulk-phi: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
-  write(20,"('# Average and standard deviation of long-range bulk-phi: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
+  write(20,"('# Average and standard deviation of long-range bulk-phi: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
+  write(20,"('#')")
+
+  ! Check the error of the last Angstrom of the computed gss relative to bulk density
+
+  bulkerror = 0.e0
+  do i = ibulk, nbins
+    bulkerror = bulkerror + gss(i)
+  end do
+  bulkerror = bulkerror / ( nbins-ibulk+1 )
+  do i = ibulk, nbins
+    sdbulkerror = (bulkerror - gss(i))**2
+  end do
+  sdbulkerror = sqrt(sdbulkerror/(nbins-ibulk+1))
+  write(*,*)
+  write(*,"('  Average and standard deviation long-range bulk-gss: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
+  write(20,"('# Average and standard deviation of long-range bulk-gss: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
   write(20,"('#')")
 
   ! Output table
@@ -1068,9 +1076,23 @@ program g_solute_solvent
     end do
   end do
   kbintsphere = 0.e0
+  volume = 0.e0
+  md_int = 0.e0
+  md_rand_int = 0.e0
   do i = 1, nbins
 
     ! KB integrals 
+
+    md_int = md_int + md_count(i)
+    md_rand_int = md_rand_int + md_count_random(i)
+    volume = volume + shellvolume(i)
+
+    kb(i) = convert*(1.e0/bulkdensity)*(md_int - md_rand_int) 
+    !if ( md_rand_int > 0 ) then
+    !  kb(i) = convert*(volume)*(md_int/md_rand_int - 1.e0) 
+    !else
+    !  kb(i) = 0.e0
+    !end if
 
     do j = i, nbins
       if ( md_count_random(i) > 0.e0 ) then
