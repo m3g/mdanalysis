@@ -1087,12 +1087,12 @@ program g_solute_solvent
     md_rand_int = md_rand_int + md_count_random(i)
     volume = volume + shellvolume(i)
 
-    kb(i) = convert*(1.e0/bulkdensity)*(md_int - md_rand_int) 
-    !if ( md_rand_int > 0 ) then
-    !  kb(i) = convert*(volume)*(md_int/md_rand_int - 1.e0) 
-    !else
-    !  kb(i) = 0.e0
-    !end if
+    !kb(i) = convert*(1.e0/bulkdensity)*(md_int - md_rand_int) 
+    if ( md_rand_int > 0 ) then
+      kb(i) = convert*(volume)*(md_int/md_rand_int - 1.e0) 
+    else
+      kb(i) = 0.e0
+    end if
 
     do j = i, nbins
       if ( md_count_random(i) > 0.e0 ) then
