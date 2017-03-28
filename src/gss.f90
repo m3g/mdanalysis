@@ -1067,7 +1067,7 @@ program g_solute_solvent
   &'#      12  Spherical-shifted minimum distance ')")
   write(20,"('#')")
   write(20,"('#   1-DISTANCE         2-PHI         3-GSS 4-GSS PHANTOM  5-SITE COUNT  6-COUNT RAND&
-            &   7-SHELL VOL  8-SPHERE VOL  9-PHI/SPHERE     10-KB INT  11-KB SPHERE     12-RSHIFT')")
+              &   7-SHELL VOL  8-SPHERE VOL  9-PHI/SPHERE     10-KB INT  11-KB SPHERE     12-RSHIFT')")
 
   do i = 1, nbins
     kb(i) = 0.e0
@@ -1087,12 +1087,13 @@ program g_solute_solvent
     md_rand_int = md_rand_int + md_count_random(i)
     volume = volume + shellvolume(i)
 
-    !kb(i) = convert*(1.e0/bulkdensity)*(md_int - md_rand_int) 
-    if ( md_rand_int > 0 ) then
-      kb(i) = convert*(volume)*(md_int/md_rand_int - 1.e0) 
-    else
-      kb(i) = 0.e0
-    end if
+!voltar
+    kb(i) = convert*(1.e0/bulkdensity)*(md_int - md_rand_int) 
+    !if ( md_rand_int > 0 ) then
+    !  kb(i) = convert*(volume)*(md_int/md_rand_int - 1.e0) 
+    !else
+    !  kb(i) = 0.e0
+    !end if
 
     do j = i, nbins
       if ( md_count_random(i) > 0.e0 ) then
