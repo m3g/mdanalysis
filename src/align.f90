@@ -384,7 +384,7 @@ end if
 nframes = 0
 do idcd = 1, ndcd
   open(10,file=dcdfile(idcd),action='read',form='unformatted')
-  read(10) dummyc, nfdcd(idcd)
+  call getnframes(10,nfdcd(idcd),dcdaxis,lastframe)
   close(10)
   write(*,*) ' Number of frames of DCD file ', idcd,':', nfdcd(idcd)
   nframes = nframes + nfdcd(idcd)
