@@ -1,17 +1,17 @@
 #
 # Example input file for gss.f90
 #
-# Version 17.100
+# Version 17.060
 #
 
 # System:
-psf ./large.psf
-dcd ./production-large.dcd
+psf ./toy.psf
+dcd ./production.dcd
 
 # Group definitions: group1 and group2 can be VMD-style selections
 # if the program is running from the gss.sh script (and VMD is available)
-solute resname TIP3 and residue 100
-solvent resname TIP3 and not residue 100
+solute segname BGLC
+solvent resname TIP3 and name OH2
 
 # Otherwise, use a pdb file with beta factors (1.00 for group1 and 2.00 for group2)
 # and "1.00" in the occupancy factor for the excluded selection.
@@ -29,13 +29,16 @@ stride 1
 periodic readfromdcd
 #periodic 80.785998702 80.7870016098 80.78000
 
+# cutoff: The maximum distance that must be considered for calculations.
+# The greater the better but, of course, not too great so that periodic
+# boundary conditions come into play. Also, calculations become slower
+# with the square of the cutoff. 
+cutoff 16.
+
 # dbulk: The distance from the solute from which it is believed that
 # the solution behaves as a bulk solution (the distance above which
-# the influence of the solute on the solvent structure is negligible). 
-# This distance must be smaller than half of the periodic length of
-# the box. It is also used as a cutoff for distance calculations, so
-#that increasing it makes computations more costly.  
-dbulk 16.
+# the influence of the solute on the solvent structure is negligible).
+dbulk 14.
 
 # binstep: The width of the histogram. It will not affect results, but
 # it may affect the smoothness of the plots. Greater bins, greater smoothness,
@@ -49,7 +52,7 @@ nint 10
 
 # Use this option if you are running the package and printing the output
 # on the screen:
-onscreenprogress
+#onscreenprogress
 
 
 

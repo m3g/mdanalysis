@@ -60,23 +60,21 @@ program g_solute_solvent
              nframes, dummyi, ntotat, memframes, ncycles, memlast,&
              iframe, icycle, nfrcycle, iatom, &
              status, keystatus, iargc, lastatom, nres, nrsolute,&
-             nrsolvent, kframe, ibin, nbins, natoms_solvent,&
+             nrsolvent, kframe, irad, nbins, natoms_solvent,&
              nsmalld, & 
              frames
   integer :: nrsolvent_random, natsolvent_random
   integer :: maxsmalld
   logical :: memerror
-  real :: dbulk, density_fix 
-  real :: md_int, md_rand_int, volume
-  integer :: nbulk, ibulk, nint, nbulk_random, notbulk
+  real :: dbulk, density_fix
+  integer :: nbulk, ibulk, nintegral, nbulk_random
   real :: convert
   double precision :: readsidesx, readsidesy, readsidesz, t
   real :: side(memory,3), mass1, mass2, random, axis(3)
   real :: dummyr, xdcd(memory), ydcd(memory), zdcd(memory),&
           time0, etime, tarray(2),&
-          binstep, kbintsphere
-  real :: bulkdensity, totalvolume, bulkvolume, simdensity, solutevolume, av_totalvolume, &
-          domaindensity
+          binstep, cutoff,  kbintsphere, bulkdensity_at_frame
+  real :: bulkdensity, totalvolume, bulkvolume, simdensity, solutevolume, av_totalvolume
   real :: bulkerror, sdbulkerror
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
@@ -158,7 +156,7 @@ program g_solute_solvent
   
   ! Seed for random number generator
   
-  call init_random_number(654321)
+  call init_random_number(1811)
   
   ! Some default parameters
   
@@ -168,8 +166,9 @@ program g_solute_solvent
   periodic = .true.
   readfromdcd = .true.
   nbins = 1000
-  nint = 10
+  nintegral = 10
   dbulk = 12.
+  cutoff = 14.
   binstep = 0.1e0
   onscreenprogress = .false.
 
@@ -224,7 +223,11 @@ program g_solute_solvent
       if(keystatus /= 0) exit 
     else if(keyword(record) == 'nint') then
       line = value(record)
-      read(line,*,iostat=keystatus) nint
+      read(line,*,iostat=keystatus) nintegral
+      if(keystatus /= 0) exit 
+    else if(keyword(record) == 'cutoff') then
+      line = value(record)
+      read(line,*,iostat=keystatus) cutoff
       if(keystatus /= 0) exit 
     else if(keyword(record) == 'dbulk') then
       line = value(record)
@@ -308,14 +311,24 @@ program g_solute_solvent
 
   convert = mole / 1.e24
 
-  ! Check compatibility of dbulk and binstep
+  ! compute ibulk from dbulk (distance from which the solvent is considered bulk,
+  ! in the estimation of bulk density)
 
+  if ( dbulk >= cutoff ) then
+    write(*,*) ' ERROR: The bulk volume is zero (dbulk >= cutoff). '
+    stop
+  end if
   if ( dbulk-int(dbulk/binstep)*binstep > 1.e-5 ) then
     write(*,*) ' ERROR: dbulk must be a multiple of binstep. '  
     stop
   end if
+  if ( (cutoff-dbulk)-int((cutoff-dbulk)/binstep)*binstep > 1.e-5 ) then
+    write(*,*) ' ERROR: (cutoff-dbulk) must be a multiple of binstep. '  
+    stop
+  end if
 
-  nbins = int(dbulk/binstep)
+  nbins = int(cutoff/binstep)
+  ibulk = int(dbulk/binstep) + 1
 
   write(*,*) ' Width of histogram bins: ', binstep
   write(*,*) ' Number of bins of histograms: ', nbins
@@ -346,8 +359,9 @@ program g_solute_solvent
     write(*,*) ' Last frame to be considered: ', lastframe
   end if
   write(*,*) ' Stride (will jump frames): ', stride
+  write(*,*) ' Cutoff for linked cells: ', cutoff
   write(*,*) ' Bulk distance: ', dbulk
-  write(*,*) ' Multiplying factor for random count: ', nint
+  write(*,*) ' Multiplying factor for random count: ', nintegral
   
   ! Read PSF file
   
@@ -466,7 +480,7 @@ program g_solute_solvent
   
   ! The number of random molecules for numerical normalization 
 
-  nrsolvent_random = nint*nrsolvent
+  nrsolvent_random = nintegral*nrsolvent
   natsolvent_random = natoms_solvent*nrsolvent_random
 
   ! Initialization of the smalldistances routine arrays
@@ -476,7 +490,7 @@ program g_solute_solvent
 
   ! Allocate xyz and minimum-distance count arrays
 
-  maxatom = max(natom,nsolute+natsolvent_random)
+  maxatom = nsolute + max(nsolvent,natsolvent_random)
   allocate( x(maxatom), y(maxatom), z(maxatom) )
   allocate( imind(nrsolvent_random), mind_mol(nrsolvent_random), mind_atom(natsolvent_random) )
 
@@ -556,7 +570,6 @@ program g_solute_solvent
       site_count_atom_random(j,i) = 0.e0
     end do
   end do
-  domaindensity = 0.e0
   bulkdensity = 0.e0
   simdensity = 0.e0
   av_totalvolume = 0.e0
@@ -606,21 +619,6 @@ program g_solute_solvent
     do kframe = 1, nfrcycle
       iframe = iframe + 1
 
-      ! Write progress
-
-      if ( iframe >= firstframe ) then
-        if ( onscreenprogress ) then
-          write(*,"( 7a,f6.2,'%' )",advance='no') (char(8),i=1,7), 100.*float(kframe)/nfrcycle
-        else
-          if ( mod(iframe-firstframe,max(1,(frames/1000))) == 0 .and. &
-               mod(iframe-firstframe,stride) == 0 ) then
-            write(*,"( '  Progress: ',f6.2,'%' )") 100.*float((iframe-firstframe)/stride)/frames
-          end if
-        end if
-      end if
-
-      ! Skip if stride determines so
-  
       if(mod(iframe-firstframe,stride) /= 0 .or. iframe < firstframe ) then
         iatom = iatom + ntotat
         cycle
@@ -632,11 +630,11 @@ program g_solute_solvent
       axis(2) = side(kframe,2) 
       axis(3) = side(kframe,3) 
 
-      if ( dbulk > axis(1)/2.e0 .or. &
-           dbulk > axis(2)/2.e0 .or. &
-           dbulk > axis(3)/2.d0 ) then
+      if ( cutoff > axis(1)/2.e0 .or. &
+           cutoff  > axis(2)/2.e0 .or. &
+           cutoff > axis(3)/2.d0 ) then
         write(*,*)
-        write(*,*) " ERROR: dbulk > periodic_dimension/2 "
+        write(*,*) " ERROR: cutoff > periodic_dimension/2 "
         stop
       end if
 
@@ -657,12 +655,12 @@ program g_solute_solvent
         z(solvent(i)) = zdcd(ii)
       end do
 
-      ! Compute all distances that are smaller than dbulk
+      ! Compute all distances that are smaller than the cutoff
 
       memerror = .true.
       do while ( memerror ) 
         memerror = .false.
-        call smalldistances(nsolute,solute,nsolvent,solvent,x,y,z,dbulk,&
+        call smalldistances(nsolute,solute,nsolvent,solvent,x,y,z,cutoff,&
                             nsmalld,ismalld,dsmalld,axis,maxsmalld,memerror)
         if ( memerror ) then
           deallocate( ismalld, dsmalld )
@@ -678,11 +676,11 @@ program g_solute_solvent
       ! For each solvent residue, get the MINIMUM distance to the solute
     
       do i = 1, nrsolvent
-        mind_mol(i) = dbulk + 1.e0
+        mind_mol(i) = cutoff + 1.e0
         imind(i) = 0
       end do
       do i = 1, nsolvent
-        mind_atom(i) = dbulk + 1.e0
+        mind_atom(i) = cutoff + 1.e0
       end do
       do i = 1, nsmalld
         ! Counting for computing the whole-molecule phi 
@@ -702,11 +700,11 @@ program g_solute_solvent
       ! Summing up current data to the phi histogram
 
       do i = 1, nrsolvent
-        ibin = int(float(nbins)*mind_mol(i)/dbulk)+1
-        if( ibin <= nbins ) then
-          md_count(ibin) = md_count(ibin) + 1.e0
+        irad = int(float(nbins)*mind_mol(i)/cutoff)+1
+        if( irad <= nbins ) then
+          md_count(irad) = md_count(irad) + 1.e0
           if ( imind(i) > 0 ) then
-            md_atom_contribution(imind(i),ibin) = md_atom_contribution(imind(i),ibin) + 1.e0
+            md_atom_contribution(imind(i),irad) = md_atom_contribution(imind(i),irad) + 1.e0
           end if
         end if
       end do
@@ -714,17 +712,16 @@ program g_solute_solvent
       ! Site count at frame, to estimate the bulk density, is performed for a
       ! single solvent reference site, which is taken as atom of type 1 of the solvent
 
-      notbulk = 0
+      nbulk = 0
       do i = 1, nsolvent
-        ibin = int(float(nbins)*mind_atom(i)/dbulk)+1
-        if( ibin <= nbins ) then
+        irad = int(float(nbins)*mind_atom(i)/cutoff)+1
+        if( irad <= nbins ) then
           j = mod(i,natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
-          site_count_atom(j,ibin) = site_count_atom(j,ibin) + 1.e0
-          if ( j == 1 ) notbulk = notbulk + 1
+          site_count_atom(j,irad) = site_count_atom(j,irad) + 1.e0
+          if ( j == 1 .and. irad >= ibulk ) nbulk = nbulk + 1
         end if
       end do
-      nbulk = nrsolvent - notbulk
 
       ! Total volume of the box at this frame
 
@@ -773,12 +770,24 @@ program g_solute_solvent
           solvent_molecule(i,3) = zdcd(jj+i-1)
         end do
 
-        ! Put atom 1 in the center of rotation of the molecule
-
+        ! Put molecule in its center of coordinates for it to be the reference coordinate for the 
+        ! random coordinates that will be generated
+  
+        cmx = 0.
+        cmy = 0.
+        cmz = 0.
         do i = 1, natoms_solvent
-          xref(i) = solvent_molecule(i,1) - solvent_molecule(1,1)
-          yref(i) = solvent_molecule(i,2) - solvent_molecule(1,2)
-          zref(i) = solvent_molecule(i,3) - solvent_molecule(1,3)
+          cmx = cmx + solvent_molecule(i,1)
+          cmy = cmy + solvent_molecule(i,2)
+          cmz = cmz + solvent_molecule(i,3)
+        end do
+        cmx = cmx / float(natoms_solvent)
+        cmy = cmy / float(natoms_solvent)
+        cmz = cmz / float(natoms_solvent)
+        do i = 1, natoms_solvent
+          xref(i) = solvent_molecule(i,1) - cmx
+          yref(i) = solvent_molecule(i,2) - cmy
+          zref(i) = solvent_molecule(i,3) - cmz
         end do
 
         ! Generate a random position for this molecule
@@ -812,7 +821,7 @@ program g_solute_solvent
       memerror = .true.
       do while ( memerror ) 
         memerror = .false.
-        call smalldistances(nsolute,solute2,natsolvent_random,solvent_random,x,y,z,dbulk,&
+        call smalldistances(nsolute,solute2,natsolvent_random,solvent_random,x,y,z,cutoff,&
                             nsmalld,ismalld,dsmalld,axis,maxsmalld,memerror)
         if ( memerror ) then
           deallocate( ismalld, dsmalld )
@@ -825,7 +834,7 @@ program g_solute_solvent
       ! in each region
 
       do i = 1, nrsolvent_random
-        mind_mol(i) = dbulk + 1.e0
+        mind_mol(i) = cutoff + 1.e0
         imind(i) = 0
       end do
       do i = 1, nsmalld
@@ -839,43 +848,43 @@ program g_solute_solvent
       end do
 
       ! So lets count the sites at each bin distance for the non-interacting distribution 
+      ! rescaled for the correct density
 
       do i = 1, nrsolvent_random
-        ibin = int(float(nbins)*mind_mol(i)/dbulk)+1
-        if ( ibin <= nbins ) then
-          md_count_random(ibin) = md_count_random(ibin) + 1.e0
+        irad = int(float(nbins)*mind_mol(i)/cutoff)+1
+        if ( irad <= nbins ) then
+          md_count_random(irad) = md_count_random(irad) + 1.e0
         end if
       end do
 
       ! Accumulate site count for each atom
 
       do i = 1, natsolvent_random
-        mind_atom(i) = dbulk + 1.e0
+        mind_atom(i) = cutoff + 1.e0
       end do
       do i = 1, nsmalld
         if ( dsmalld(i) < mind_atom(ismalld(i)) ) then
           mind_atom(ismalld(i)) = dsmalld(i)
         end if
       end do
-      notbulk = 0
+      nbulk_random = 0
       do i = 1, natsolvent_random
-        ibin = int(float(nbins)*mind_atom(i)/dbulk)+1
-        if ( ibin <= nbins ) then
+        irad = int(float(nbins)*mind_atom(i)/cutoff)+1
+        if ( irad <= nbins ) then
           j = mod(i,natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
-          site_count_atom_random(j,ibin) = site_count_atom_random(j,ibin) + 1.e0
+          site_count_atom_random(j,irad) = site_count_atom_random(j,irad) + 1.e0
 
           ! The counting of single-sites at the bulk region will be used to estimate
-          ! the volumes of spherical shells of radius ibin
+          ! the volumes of spherical shells of radius irad
 
           if ( j == 1 ) then
-            shellvolume(ibin) = shellvolume(ibin) + 1.e0
-            notbulk = notbulk + 1
+            shellvolume(irad) = shellvolume(irad) + 1.e0
+            if ( irad >= ibulk ) nbulk_random = nbulk_random + 1
           end if
 
         end if
       end do
-      nbulk_random = nrsolvent_random - notbulk
       if ( nbulk_random == 0 ) then
         write(*,*) 
         write(*,*) ' ERROR: zero volume estimated for bulk region. Either the region is '
@@ -891,9 +900,19 @@ program g_solute_solvent
 
       ! These are averaged at the end for final report:
 
-      bulkdensity = bulkdensity + float(nbulk)/bulkvolume
-      domaindensity = domaindensity + float(nbulk)/bulkvolume
+      bulkdensity_at_frame = float(nbulk)/bulkvolume
+      bulkdensity = bulkdensity + bulkdensity_at_frame
 
+      ! Write progress
+
+      if ( onscreenprogress ) then
+        write(*,"( 7a,f6.2,'%' )",advance='no') (char(8),i=1,7), 100.*float(kframe)/nfrcycle
+      else
+        if ( mod(iframe,max(1,(frames/1000))) == 0 ) then
+          write(*,"( '  Progress: ',f6.2,'%' )") 100.*float(iframe)/frames
+        end if
+      end if
+  
       iatom = iatom + ntotat
     end do
     write(*,*)
@@ -904,25 +923,23 @@ program g_solute_solvent
   ! Averaging results on the number of frames
   !
 
-  simdensity = simdensity / frames
   bulkdensity = bulkdensity / frames
-  domaindensity = domaindensity / frames
+  simdensity = simdensity / frames
   av_totalvolume = av_totalvolume / frames
   density_fix = (bulkdensity*av_totalvolume)/nrsolvent_random
 
   write(*,*)
-  write(*,"(a,e12.5)") '  Solvent density in simulation box (sites/A^3): ', simdensity
-  write(*,"(a,e12.5)") '  Estimated bulk solvent density (sites/A^3): ', bulkdensity
-  write(*,"(a,e12.5)") '  Estimated solvent density on solute domain (sites/A^3): ', domaindensity
+  write(*,"(a,f12.5)") '  Solvent density in simulation box (sites/A^3): ', simdensity
+  write(*,"(a,f12.5)") '  Estimated bulk solvent density (sites/A^3): ', bulkdensity
   write(*,*)
-  write(*,"(a,e12.5)") '  Molar volume of solvent in simulation box (cc/mol): ', convert/simdensity
-  write(*,"(a,e12.5)") '  Molar volume of solvent in bulk (cc/mol): ', convert/bulkdensity
+  write(*,"(a,f12.5)") '  Molar volume of solvent in simulation box (cc/mol): ', convert/simdensity
+  write(*,"(a,f12.5)") '  Molar volume of solvent in bulk (cc/mol): ', convert/bulkdensity
   write(*,*)
   write(*,"(a,f12.5)") '  Density scaling factor for numerical integration: ', density_fix
 
   solutevolume = convert*(bulkdensity*av_totalvolume - nrsolvent)/bulkdensity
   write(*,*)
-  write(*,"(a,e12.5)") '  Solute partial volume (cc/mol): ', solutevolume
+  write(*,"(a,f12.5)") '  Solute partial volume (cc/mol): ', solutevolume
    
   do i = 1, nbins
 
@@ -951,16 +968,15 @@ program g_solute_solvent
 
     if ( shellvolume(i) > 0.e0 ) then
       gss(i) = md_count(i)/(bulkdensity*shellvolume(i))
+      gss_phantom(i) = md_count_random(i)/(bulkdensity*shellvolume(i))
       do j = 1, natoms_solvent
         gss_atom_contribution(j,i) = md_atom_contribution(j,i)/(bulkdensity*shellvolume(i))
       end do
-      gss_phantom(i) = md_count_random(i)/(bulkdensity*shellvolume(i))
     else 
       gss(i) = 0.e0
       do j = 1, natoms_solvent
         gss_atom_contribution(j,i) = 0.e0
       end do
-      gss_phantom(i) = natoms_solvent
     end if
 
     ! Additional distribution required for computing atomic parameters
@@ -995,12 +1011,12 @@ program g_solute_solvent
              &'# Periodic boundary conditions: ',/,&
              &'# Periodic: ',l1,' Read from DCD: ',l1,/,&
              &'#',/,&
-             &'# Density of solvent in simulation box (sites/A^3): ',e12.5,/,&
-             &'# Density of solvent in bulk (estimated) (sites/A^3): ',e12.5,/,&
-             &'# Molar volume of solvent in simulation (cc/mol): ',e12.5,/,&
-             &'# Molar volume of solvent in bulk (estimated) (cc/mol): ',e12.5,/,&
+             &'# Density of solvent in simulation box (sites/A^3): ',f12.5,/,&
+             &'# Density of solvent in bulk (estimated) (sites/A^3): ',f12.5,/,&
+             &'# Molar volume of solvent in simulation (cc/mol): ',f12.5,/,&
+             &'# Molar volume of solvent in bulk (estimated) (cc/mol): ',f12.5,/,&
              &'#',/,&
-             &'# Solute partial volume estimate (cc/mol): ',e12.5,/,&
+             &'# Solute partial volume estimate (cc/mol): ',f12.5,/,&
              &'#',/,&
              &'# Number of atoms and mass of group 1: ',i6,f12.3,/,&
              &'# First and last atoms of group 1: ',i6,tr1,i6,/,&
@@ -1017,9 +1033,6 @@ program g_solute_solvent
              &nsolute, mass1, solute(1), solute(nsolute),& 
              &nsolvent, mass2, solvent(1), solvent(nsolvent)  
 
-  ! Check the error of the last Angstrom of the computed phi relative to bulk density
-
-  ibulk = int((dbulk-1.e0)/binstep) + 1
   bulkerror = 0.e0
   do i = ibulk, nbins
     bulkerror = bulkerror + phi(i)
@@ -1030,25 +1043,9 @@ program g_solute_solvent
   end do
   sdbulkerror = sqrt(sdbulkerror/(nbins-ibulk+1))
   write(*,*)
-  write(*,"('  Average and standard deviation long-range bulk-phi: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
-  write(20,"('# Average and standard deviation of long-range bulk-phi: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
+  write(*,"('  Average and standard deviation of bulk-phi: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
   write(20,"('#')")
-
-  ! Check the error of the last Angstrom of the computed gss relative to bulk density
-
-  bulkerror = 0.e0
-  do i = ibulk, nbins
-    bulkerror = bulkerror + gss(i)
-  end do
-  bulkerror = bulkerror / ( nbins-ibulk+1 )
-  do i = ibulk, nbins
-    sdbulkerror = (bulkerror - gss(i))**2
-  end do
-  sdbulkerror = sqrt(sdbulkerror/(nbins-ibulk+1))
-  write(*,*)
-  write(*,"('  Average and standard deviation long-range bulk-gss: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
-  write(20,"('# Average and standard deviation of long-range bulk-gss: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
-  write(20,"('#')")
+  write(20,"('# Average and standard deviation of bulk-phi: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
 
   ! Output table
 
@@ -1067,7 +1064,7 @@ program g_solute_solvent
   &'#      12  Spherical-shifted minimum distance ')")
   write(20,"('#')")
   write(20,"('#   1-DISTANCE         2-PHI         3-GSS 4-GSS PHANTOM  5-SITE COUNT  6-COUNT RAND&
-              &   7-SHELL VOL  8-SPHERE VOL  9-PHI/SPHERE     10-KB INT  11-KB SPHERE     12-RSHIFT')")
+            &   7-SHELL VOL  8-SPHERE VOL  9-PHI/SPHERE     10-KB INT  11-KB SPHERE     12-RSHIFT')")
 
   do i = 1, nbins
     kb(i) = 0.e0
@@ -1076,24 +1073,9 @@ program g_solute_solvent
     end do
   end do
   kbintsphere = 0.e0
-  volume = 0.e0
-  md_int = 0.e0
-  md_rand_int = 0.e0
   do i = 1, nbins
 
     ! KB integrals 
-
-    md_int = md_int + md_count(i)
-    md_rand_int = md_rand_int + md_count_random(i)
-    volume = volume + shellvolume(i)
-
-!voltar
-    kb(i) = convert*(1.e0/bulkdensity)*(md_int - md_rand_int) 
-    !if ( md_rand_int > 0 ) then
-    !  kb(i) = convert*(volume)*(md_int/md_rand_int - 1.e0) 
-    !else
-    !  kb(i) = 0.e0
-    !end if
 
     do j = i, nbins
       if ( md_count_random(i) > 0.e0 ) then
