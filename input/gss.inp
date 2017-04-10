@@ -33,12 +33,12 @@ periodic readfromdcd
 # The greater the better but, of course, not too great so that periodic
 # boundary conditions come into play. Also, calculations become slower
 # with the square of the cutoff. 
-cutoff 16.
+cutoff 15.
 
 # dbulk: The distance from the solute from which it is believed that
 # the solution behaves as a bulk solution (the distance above which
 # the influence of the solute on the solvent structure is negligible).
-dbulk 14.
+dbulk 10.
 
 # binstep: The width of the histogram. It will not affect results, but
 # it may affect the smoothness of the plots. Greater bins, greater smoothness,

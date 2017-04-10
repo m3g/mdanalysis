@@ -167,9 +167,9 @@ program g_solute_solvent
   readfromdcd = .true.
   nbins = 1000
   nintegral = 10
-  dbulk = 12.
-  cutoff = 14.
-  binstep = 0.1e0
+  dbulk = 10.
+  cutoff = 15.
+  binstep = 0.02e0
   onscreenprogress = .false.
 
   ! Default output file names
