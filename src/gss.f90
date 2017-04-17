@@ -490,7 +490,7 @@ program g_solute_solvent
 
   ! Allocate xyz and minimum-distance count arrays
 
-  maxatom = nsolute + max(nsolvent,natsolvent_random)
+  maxatom = max(natom,nsolute+max(nsolvent,natsolvent_random))
   allocate( x(maxatom), y(maxatom), z(maxatom) )
   allocate( imind(nrsolvent_random), mind_mol(nrsolvent_random), mind_atom(natsolvent_random) )
 
