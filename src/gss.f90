@@ -61,8 +61,7 @@ program g_solute_solvent
              iframe, icycle, nfrcycle, iatom, &
              status, keystatus, iargc, lastatom, nres, nrsolute,&
              nrsolvent, kframe, irad, nbins, natoms_solvent,&
-             nsmalld, & 
-             frames
+             nsmalld, frames, irefatom
   integer :: nrsolvent_random, natsolvent_random
   integer :: maxsmalld
   logical :: memerror
@@ -171,6 +170,7 @@ program g_solute_solvent
   cutoff = 15.
   binstep = 0.02e0
   onscreenprogress = .false.
+  irefatom = 1
 
   ! Default output file names
 
@@ -232,6 +232,10 @@ program g_solute_solvent
     else if(keyword(record) == 'dbulk') then
       line = value(record)
       read(line,*,iostat=keystatus) dbulk
+      if(keystatus /= 0) exit 
+    else if(keyword(record) == 'irefatom') then
+      line = value(record)
+      read(line,*,iostat=keystatus) irefatom
       if(keystatus /= 0) exit 
     else if(keyword(record) == 'onscreenprogress') then
       onscreenprogress = .true.
@@ -477,6 +481,11 @@ program g_solute_solvent
 
   natoms_solvent = nsolvent / nrsolvent 
   write(*,*)  ' Number of atoms of each solvent molecule: ', natoms_solvent
+  if ( irefatom > natoms_solvent ) then
+    write(*,*) ' ERROR: Reference atom index', irefatom, ' is greater than number of '
+    write(*,*)          atoms of the solvent molecule. '
+    stop
+  end if
   
   ! The number of random molecules for numerical normalization 
 
@@ -710,7 +719,7 @@ program g_solute_solvent
       end do
 
       ! Site count at frame, to estimate the bulk density, is performed for a
-      ! single solvent reference site, which is taken as atom of type 1 of the solvent
+      ! single solvent reference site, which is taken as atom of type 'irefatom' of the solvent
 
       nbulk = 0
       do i = 1, nsolvent
@@ -719,7 +728,7 @@ program g_solute_solvent
           j = mod(i,natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
           site_count_atom(j,irad) = site_count_atom(j,irad) + 1.e0
-          if ( j == 1 .and. irad >= ibulk ) nbulk = nbulk + 1
+          if ( j == irefatom .and. irad >= ibulk ) nbulk = nbulk + 1
         end if
       end do
 
@@ -878,7 +887,7 @@ program g_solute_solvent
           ! The counting of single-sites at the bulk region will be used to estimate
           ! the volumes of spherical shells of radius irad
 
-          if ( j == 1 ) then
+          if ( j == irefatom ) then
             shellvolume(irad) = shellvolume(irad) + 1.e0
             if ( irad >= ibulk ) nbulk_random = nbulk_random + 1
           end if
@@ -893,7 +902,7 @@ program g_solute_solvent
         stop
       end if
 
-      ! We have just counted the number of times an atom of type 1 was found
+      ! We have just counted the number of times an atom of type 'irefatom' was found
       ! at the bulk region. The minimum-distance volume of the bulk is, then...
 
       bulkvolume = totalvolume*(float(nbulk_random)/nrsolvent_random)
