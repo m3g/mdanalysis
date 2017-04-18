@@ -5,7 +5,7 @@
 #
 
 # System:
-psf ./toy.psf
+psf ./production.psf
 dcd ./production.dcd
 
 # Group definitions: group1 and group2 can be VMD-style selections
@@ -29,16 +29,16 @@ stride 1
 periodic readfromdcd
 #periodic 80.785998702 80.7870016098 80.78000
 
+# dbulk: The distance from the solute from which it is believed that
+# the solution behaves as a bulk solution (the distance above which
+# the influence of the solute on the solvent structure is negligible).
+dbulk 10.
+
 # cutoff: The maximum distance that must be considered for calculations.
 # The greater the better but, of course, not too great so that periodic
 # boundary conditions come into play. Also, calculations become slower
 # with the square of the cutoff. 
 cutoff 15.
-
-# dbulk: The distance from the solute from which it is believed that
-# the solution behaves as a bulk solution (the distance above which
-# the influence of the solute on the solvent structure is negligible).
-dbulk 10.
 
 # binstep: The width of the histogram. It will not affect results, but
 # it may affect the smoothness of the plots. Greater bins, greater smoothness,
@@ -54,5 +54,8 @@ nint 10
 # on the screen:
 #onscreenprogress
 
+# Use this option if you want to change the reference atom of the solute used for
+# monte-carlo volume integration (usually this option is irrelevant)
+#irefatom 1
 
 
