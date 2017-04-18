@@ -486,7 +486,7 @@ program g_solute_solvent
     write(*,*) '        atoms of the solvent molecule. '
     stop
   else
-    write(*,*) ' Single-site reference atom: ', irefatom,':', typeat(solvent(1)+irefatom)
+    write(*,*) ' Single-site reference atom: ', irefatom,' : ', typeat(solvent(1)+irefatom-1)
   end if
   
   ! The number of random molecules for numerical normalization 
