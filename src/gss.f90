@@ -1088,19 +1088,35 @@ program g_solute_solvent
              &nsolute, mass1, solute(1), solute(nsolute),& 
              &nsolvent, mass2, solvent(1), solvent(nsolvent)  
 
-  bulkerror = 0.e0
-  do i = ibulk, nbins
-    bulkerror = bulkerror + phi(i)
-  end do
-  bulkerror = bulkerror / ( nbins-ibulk+1 )
-  do i = ibulk, nbins
-    sdbulkerror = (bulkerror - phi(i))**2
-  end do
-  sdbulkerror = sqrt(sdbulkerror/(nbins-ibulk+1))
-  write(*,*)
-  write(*,"('  Average and standard deviation of bulk-phi: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
-  write(20,"('#')")
-  write(20,"('# Average and standard deviation of bulk-phi: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
+  if ( usecutoff ) then
+    bulkerror = 0.e0
+    do i = ibulk, nbins
+      bulkerror = bulkerror + phi(i)
+    end do
+    bulkerror = bulkerror / ( nbins-ibulk+1 )
+    do i = ibulk, nbins
+      sdbulkerror = (bulkerror - phi(i))**2
+    end do
+    sdbulkerror = sqrt(sdbulkerror/(nbins-ibulk+1))
+    write(*,*)
+    write(*,"('  Average and standard deviation of bulk-phi: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
+    write(20,"('#')")
+    write(20,"('# Average and standard deviation of bulk-phi: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
+  else
+    bulkerror = 0.e0
+    do i = nbins-int(1./binstep), nbins
+      bulkerror = bulkerror + phi(i)
+    end do
+    bulkerror = bulkerror / ( int(1./binstep)+1 )
+    do i = nbins-int(1./binstep), nbins
+      sdbulkerror = (bulkerror - phi(i))**2
+    end do
+    sdbulkerror = sqrt(sdbulkerror/(int(1./binstep)+1))
+    write(*,*)
+    write(*,"('  Average and standard deviation of long range (dbulk-1.) phi: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
+    write(20,"('#')")
+    write(20,"('# Average and standard deviation of long range (dbulk-1.) phi: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
+  end if
 
   ! Output table
 
