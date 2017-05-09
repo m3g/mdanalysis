@@ -72,7 +72,8 @@ program g_solute_solvent
   real :: side(memory,3), mass1, mass2, random, axis(3)
   real :: dummyr, xdcd(memory), ydcd(memory), zdcd(memory),&
           time0, etime, tarray(2),&
-          binstep, cutoff,  kbintsphere, bulkdensity_at_frame
+          binstep, cutoff, &
+          kbintsphere, bulkdensity_at_frame
   real :: bulkdensity, totalvolume, bulkvolume, simdensity, solutevolume, av_totalvolume
   real :: bulkerror, sdbulkerror
   character(len=200) :: groupfile, line, record, value, keyword,&
@@ -81,7 +82,7 @@ program g_solute_solvent
   character(len=200) :: output, output_atom_phi,  &
                         output_atom_kb, output_atom_gss_contrib, output_atom_phi_contrib
   character(len=4) :: dummyc
-  logical :: readfromdcd, dcdaxis, periodic, onscreenprogress
+  logical :: readfromdcd, dcdaxis, periodic, onscreenprogress, usecutoff
   real :: shellradius, rshift
   real :: sphericalshellvolume, sphereradiusfromshellvolume
 
@@ -167,7 +168,7 @@ program g_solute_solvent
   nbins = 1000
   nintegral = 10
   dbulk = 10.
-  cutoff = 15.
+  usecutoff = .false.
   binstep = 0.02e0
   onscreenprogress = .false.
   irefatom = 1
@@ -228,6 +229,11 @@ program g_solute_solvent
     else if(keyword(record) == 'cutoff') then
       line = value(record)
       read(line,*,iostat=keystatus) cutoff
+      if ( cutoff < 0. ) then
+        usecutoff = .false.
+      else
+        usecutoff = .true.
+      end if
       if(keystatus /= 0) exit 
     else if(keyword(record) == 'dbulk') then
       line = value(record)
@@ -318,22 +324,27 @@ program g_solute_solvent
   ! compute ibulk from dbulk (distance from which the solvent is considered bulk,
   ! in the estimation of bulk density)
 
-  if ( dbulk >= cutoff ) then
-    write(*,*) ' ERROR: The bulk volume is zero (dbulk >= cutoff). '
-    stop
-  end if
   if ( dbulk-int(dbulk/binstep)*binstep > 1.e-5 ) then
     write(*,*) ' ERROR: dbulk must be a multiple of binstep. '  
     stop
   end if
-  if ( (cutoff-dbulk)-int((cutoff-dbulk)/binstep)*binstep > 1.e-5 ) then
-    write(*,*) ' ERROR: (cutoff-dbulk) must be a multiple of binstep. '  
-    stop
+  if ( usecutoff ) then
+    if ( dbulk >= cutoff ) then
+      write(*,*) ' ERROR: The bulk volume is zero (dbulk >= cutoff). '
+      stop
+    end if
+    if ( (cutoff-dbulk)-int((cutoff-dbulk)/binstep)*binstep > 1.e-5 ) then
+      write(*,*) ' ERROR: (cutoff-dbulk) must be a multiple of binstep. '  
+      stop
+    end if
+    nbins = int(cutoff/binstep)
+    ibulk = int(dbulk/binstep) + 1
+  else
+   write(*,*) ' cutoff < 0: will use ntot-n(dbulk) as nbulk '
+   nbins = int(dbulk/binstep)
+   ibulk = int(dbulk/binstep) + 1
+   cutoff = dbulk
   end if
-
-  nbins = int(cutoff/binstep)
-  ibulk = int(dbulk/binstep) + 1
-
   write(*,*) ' Width of histogram bins: ', binstep
   write(*,*) ' Number of bins of histograms: ', nbins
 
@@ -642,10 +653,14 @@ program g_solute_solvent
       axis(3) = side(kframe,3) 
 
       if ( cutoff > axis(1)/2.e0 .or. &
-           cutoff  > axis(2)/2.e0 .or. &
+           cutoff > axis(2)/2.e0 .or. &
            cutoff > axis(3)/2.d0 ) then
         write(*,*)
-        write(*,*) " ERROR: cutoff > periodic_dimension/2 "
+        if ( usecutoff ) then
+          write(*,*) " ERROR: cutoff > periodic_dimension/2 "
+        else
+          write(*,*) " ERROR: dbulk > periodic_dimension/2 "
+        end if
         stop
       end if
 
@@ -723,16 +738,30 @@ program g_solute_solvent
       ! Site count at frame, to estimate the bulk density, is performed for a
       ! single solvent reference site, which is taken as atom of type 'irefatom' of the solvent
 
-      nbulk = 0
-      do i = 1, nsolvent
-        irad = int(float(nbins)*mind_atom(i)/cutoff)+1
-        if( irad <= nbins ) then
+      if ( usecutoff ) then
+        nbulk = 0
+        do i = 1, nsolvent
+          irad = int(float(nbins)*mind_atom(i)/cutoff)+1
+          if( irad <= nbins ) then
+            j = mod(i,natoms_solvent) 
+            if ( j == 0 ) j = natoms_solvent
+            site_count_atom(j,irad) = site_count_atom(j,irad) + 1.e0
+            if ( j == irefatom .and. irad >= ibulk ) nbulk = nbulk + 1
+          end if
+        end do
+      else
+        nbulk = 0
+        do i = 1, nsolvent
+          irad = int(float(nbins)*mind_atom(i)/cutoff)+1
           j = mod(i,natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
-          site_count_atom(j,irad) = site_count_atom(j,irad) + 1.e0
-          if ( j == irefatom .and. irad >= ibulk ) nbulk = nbulk + 1
-        end if
-      end do
+          if( irad <= nbins ) then
+            site_count_atom(j,irad) = site_count_atom(j,irad) + 1.e0
+          else
+            if ( j == irefatom ) nbulk = nbulk + 1
+          end if
+        end do
+      end if
 
       ! Total volume of the box at this frame
 
@@ -878,24 +907,39 @@ program g_solute_solvent
           mind_atom(ismalld(i)) = dsmalld(i)
         end if
       end do
-      nbulk_random = 0
-      do i = 1, natsolvent_random
-        irad = int(float(nbins)*mind_atom(i)/cutoff)+1
-        if ( irad <= nbins ) then
+      if ( usecutoff ) then
+        nbulk_random = 0
+        do i = 1, natsolvent_random
+          irad = int(float(nbins)*mind_atom(i)/cutoff)+1
+          if ( irad <= nbins ) then
+            j = mod(i,natoms_solvent) 
+            if ( j == 0 ) j = natoms_solvent
+            site_count_atom_random(j,irad) = site_count_atom_random(j,irad) + 1.e0
+
+            ! The counting of single-sites at the bulk region will be used to estimate
+            ! the volumes of spherical shells of radius irad
+
+            if ( j == irefatom ) then
+              shellvolume(irad) = shellvolume(irad) + 1.e0
+              if ( irad >= ibulk ) nbulk_random = nbulk_random + 1
+            end if
+
+          end if
+        end do
+      else
+        nbulk_random = 0
+        do i = 1, natsolvent_random
+          irad = int(float(nbins)*mind_atom(i)/cutoff)+1
           j = mod(i,natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
-          site_count_atom_random(j,irad) = site_count_atom_random(j,irad) + 1.e0
-
-          ! The counting of single-sites at the bulk region will be used to estimate
-          ! the volumes of spherical shells of radius irad
-
-          if ( j == irefatom ) then
-            shellvolume(irad) = shellvolume(irad) + 1.e0
-            if ( irad >= ibulk ) nbulk_random = nbulk_random + 1
+          if ( irad <= nbins ) then
+            site_count_atom_random(j,irad) = site_count_atom_random(j,irad) + 1.e0
+            if ( j == irefatom ) shellvolume(irad) = shellvolume(irad) + 1.e0
+          else
+            if ( j == irefatom ) nbulk_random = nbulk_random + 1
           end if
-
-        end if
-      end do
+        end do
+      end if
       if ( nbulk_random == 0 ) then
         write(*,*) 
         write(*,*) ' ERROR: zero volume estimated for bulk region. Either the region is '

@@ -37,8 +37,11 @@ dbulk 10.
 # cutoff: The maximum distance that must be considered for calculations.
 # The greater the better but, of course, not too great so that periodic
 # boundary conditions come into play. Also, calculations become slower
-# with the square of the cutoff. 
-cutoff 15.
+# with the square of the cutoff. An option is not to use a cutoff, in 
+# which case the number of molecules in bulk will be simply the total
+# number of molecules minus the number of molecules within dbulk. This 
+# is the default option, which is set by not setting any cutoff.
+#cutoff 15.
 
 # binstep: The width of the histogram. It will not affect results, but
 # it may affect the smoothness of the plots. Greater bins, greater smoothness,
