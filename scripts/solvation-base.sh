@@ -81,6 +81,10 @@ echo " "
 echo " ####################################################"
 vmd -dispdev text < $vmdfile > $vmdfile.log      
 
+# Check if there are errors in the vmd log file
+
+grep "ERROR" $vmdfile.log
+
 # Write the temporary solvation input file pointing to the group definitions
 
 solvationinput=$output.solvationinp
