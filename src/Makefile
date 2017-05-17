@@ -78,7 +78,7 @@ $(BIN)/energy.sh : $(SCR)/energy-base.sh
 #
 
 $(BIN)/align : $(OBJ)/common.o $(OBJ)/align.o $(BIN)/align.sh
-	$(FORTRAN) $(FLAGS) -o $(BIN)/align $(OBJ)/align.o $(OBJ)/common.o
+	$(FORTRAN) $(FLAGS) -o $(BIN)/align $(OBJ)/align.o $(OBJ)/common.o -llapack
 
 $(OBJ)/align.o : $(SRC)/align.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/align.o $(SRC)/align.f90

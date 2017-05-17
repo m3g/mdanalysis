@@ -998,187 +998,88 @@ end
 subroutine align(n_align,i_align,iatom,cmx,cmy,cmz,xdcd,ydcd,zdcd,&
                  xref,yref,zref,cmxr,cmyr,cmzr,u,xm,ym,zm,xp,yp,zp)
 
-implicit none
-integer :: i, j, iq, n_align, i_align(*), iatom, ii
-real :: xdcd(*), ydcd(*), zdcd(*), xref(*), yref(*), zref(*)
-real :: cmx, cmy, cmz, u(3,3), a(4,4), q(4,4), qmin,&
-        xm(*), ym(*), zm(*), xp(*), yp(*), zp(*),&
-        cmxr, cmyr, cmzr
- 
-! Interface to jacobi subroutine, which is in Fortran77
-
-interface 
-  subroutine jacobi(a,v,n)
-  integer :: n
-  real :: a(4,4), v(4,4)
-  end subroutine jacobi
-end interface
-
-! If the number of atoms of this group is 1, return the identity matrix
-
-if( n_align == 1 ) then
-  do i = 1, 3
-    do j = 1, 3
-      if(i == j) then
-        u(i,j) = 1.d0
-      else
-        u(i,j) = 0.d0
-      end if
+  implicit none
+  integer :: i, j, iq, n_align, i_align(*), iatom, ii
+  real :: xdcd(*), ydcd(*), zdcd(*), xref(*), yref(*), zref(*)
+  real :: cmx, cmy, cmz, u(3,3), a(4,4), q(4,4), qmin,&
+          xm(*), ym(*), zm(*), xp(*), yp(*), zp(*),&
+          cmxr, cmyr, cmzr
+  
+  ! For ssyev
+  real :: work(12)
+  integer :: info
+  
+  ! If the number of atoms of this group is 1, return the identity matrix
+  
+  if( n_align == 1 ) then
+    do i = 1, 3
+      do j = 1, 3
+        if(i == j) then
+          u(i,j) = 1.d0
+        else
+          u(i,j) = 0.d0
+        end if
+      end do
+    end do
+    return
+  end if
+   
+  ! Computing the quaternion matrix
+  
+  do i = 1, n_align
+    ii = iatom + i_align(i)
+    xm(i) = ( xref(i) - cmxr ) - ( xdcd(ii) - cmx )
+    ym(i) = ( yref(i) - cmyr ) - ( ydcd(ii) - cmy )
+    zm(i) = ( zref(i) - cmzr ) - ( zdcd(ii) - cmz )
+    xp(i) = ( xref(i) - cmxr ) + ( xdcd(ii) - cmx )
+    yp(i) = ( yref(i) - cmyr ) + ( ydcd(ii) - cmy )
+    zp(i) = ( zref(i) - cmzr ) + ( zdcd(ii) - cmz )
+  end do
+  
+  do i = 1, 4
+    do j = 1, 4
+      q(i,j) = 0.d0
     end do
   end do
-  return
-end if
- 
-! Computing the quaternion matrix
-
-do i = 1, n_align
-  ii = iatom + i_align(i)
-  xm(i) = ( xref(i) - cmxr ) - ( xdcd(ii) - cmx )
-  ym(i) = ( yref(i) - cmyr ) - ( ydcd(ii) - cmy )
-  zm(i) = ( zref(i) - cmzr ) - ( zdcd(ii) - cmz )
-  xp(i) = ( xref(i) - cmxr ) + ( xdcd(ii) - cmx )
-  yp(i) = ( yref(i) - cmyr ) + ( ydcd(ii) - cmy )
-  zp(i) = ( zref(i) - cmzr ) + ( zdcd(ii) - cmz )
-end do
-
-do i = 1, 4
-  do j = 1, 4
-    q(i,j) = 0.d0
-  end do
-end do
- 
-do i = 1, n_align
-  q(1,1) = q(1,1) + xm(i)**2 + ym(i)**2 + zm(i)**2
-  q(1,2) = q(1,2) + yp(i)*zm(i) - ym(i)*zp(i)
-  q(1,3) = q(1,3) + xm(i)*zp(i) - xp(i)*zm(i)
-  q(1,4) = q(1,4) + xp(i)*ym(i) - xm(i)*yp(i)
-  q(2,2) = q(2,2) + yp(i)**2 + zp(i)**2 + xm(i)**2
-  q(2,3) = q(2,3) + xm(i)*ym(i) - xp(i)*yp(i)
-  q(2,4) = q(2,4) + xm(i)*zm(i) - xp(i)*zp(i)
-  q(3,3) = q(3,3) + xp(i)**2 + zp(i)**2 + ym(i)**2
-  q(3,4) = q(3,4) + ym(i)*zm(i) - yp(i)*zp(i)
-  q(4,4) = q(4,4) + xp(i)**2 + yp(i)**2 + zm(i)**2
-end do
-q(2,1) = q(1,2)
-q(3,1) = q(1,3)
-q(3,2) = q(2,3)
-q(4,1) = q(1,4)
-q(4,2) = q(2,4)
-q(4,3) = q(3,4)  
    
-! Computing the eigenvectors 'a' and eigenvalues 'q' of the q matrix
+  do i = 1, n_align
+    q(1,1) = q(1,1) + xm(i)**2 + ym(i)**2 + zm(i)**2
+    q(1,2) = q(1,2) + yp(i)*zm(i) - ym(i)*zp(i)
+    q(1,3) = q(1,3) + xm(i)*zp(i) - xp(i)*zm(i)
+    q(1,4) = q(1,4) + xp(i)*ym(i) - xm(i)*yp(i)
+    q(2,2) = q(2,2) + yp(i)**2 + zp(i)**2 + xm(i)**2
+    q(2,3) = q(2,3) + xm(i)*ym(i) - xp(i)*yp(i)
+    q(2,4) = q(2,4) + xm(i)*zm(i) - xp(i)*zp(i)
+    q(3,3) = q(3,3) + xp(i)**2 + zp(i)**2 + ym(i)**2
+    q(3,4) = q(3,4) + ym(i)*zm(i) - yp(i)*zp(i)
+    q(4,4) = q(4,4) + xp(i)**2 + yp(i)**2 + zm(i)**2
+  end do
+  q(2,1) = q(1,2)
+  q(3,1) = q(1,3)
+  q(3,2) = q(2,3)
+  q(4,1) = q(1,4)
+  q(4,2) = q(2,4)
+  q(4,3) = q(3,4)  
+     
+  ! Computing the eigenvectors 'a' and eigenvalues 'q' of the q matrix
 
-call jacobi(q,a,4)
- 
-! Choosing the quaternion that corresponds to the minimum
-
-iq = 1
-qmin = q(1,1)
-do i = 2, 4
-  if(q(i,i).lt.qmin) then
-    iq = i
-    qmin = q(i,i)
-  end if
-end do
-
-! Computing the rotation matrix
-
-u(1,1) = a(1,iq)**2 + a(2,iq)**2 - a(3,iq)**2 - a(4,iq)**2
-u(1,2) = 2. * ( a(2,iq)*a(3,iq) + a(1,iq)*a(4,iq) )
-u(1,3) = 2. * ( a(2,iq)*a(4,iq) - a(1,iq)*a(3,iq) )  
-u(2,1) = 2. * ( a(2,iq)*a(3,iq) - a(1,iq)*a(4,iq) )  
-u(2,2) = a(1,iq)**2 + a(3,iq)**2 - a(2,iq)**2 - a(4,iq)**2 
-u(2,3) = 2. * ( a(3,iq)*a(4,iq) + a(1,iq)*a(2,iq) )  
-u(3,1) = 2. * ( a(2,iq)*a(4,iq) + a(1,iq)*a(3,iq) )  
-u(3,2) = 2. * ( a(3,iq)*a(4,iq) - a(1,iq)*a(2,iq) )  
-u(3,3) = a(1,iq)**2 + a(4,iq)**2 - a(2,iq)**2 - a(3,iq)**2 
-
+  call ssyev('V','U',4,q,4,a,work,12,info)
+   
+  ! Computing the rotation matrix
+  
+  iq = 1
+  u(1,1) = q(1,iq)**2 + q(2,iq)**2 - q(3,iq)**2 - q(4,iq)**2
+  u(1,2) = 2. * ( q(2,iq)*q(3,iq) + q(1,iq)*q(4,iq) )
+  u(1,3) = 2. * ( q(2,iq)*q(4,iq) - q(1,iq)*q(3,iq) )  
+  u(2,1) = 2. * ( q(2,iq)*q(3,iq) - q(1,iq)*q(4,iq) )  
+  u(2,2) = q(1,iq)**2 + q(3,iq)**2 - q(2,iq)**2 - q(4,iq)**2 
+  u(2,3) = 2. * ( q(3,iq)*q(4,iq) + q(1,iq)*q(2,iq) )  
+  u(3,1) = 2. * ( q(2,iq)*q(4,iq) + q(1,iq)*q(3,iq) )  
+  u(3,2) = 2. * ( q(3,iq)*q(4,iq) - q(1,iq)*q(2,iq) )  
+  u(3,3) = q(1,iq)**2 + q(4,iq)**2 - q(2,iq)**2 - q(3,iq)**2 
+  
 return
-end
-
-!
-! The following subroutine was not written by me (found with google,
-! tested, but the author is unknown).
-!
-
-      subroutine jacobi(a,v,n) 
-!*********************************************************************** 
-! 
-!     Diagonalisation of real symmetric matices by Jacobi method 
-! 
-!*********************************************************************** 
-      implicit real(a-h,o-z) 
-      integer i, j, k, n, m 
-      real v1, v2, v3, u, omg, c, rho, tes, scl, tem, s
-      real a(4,4),v(4,4)
-      rho=1.e-12 
-      tes=0. 
-      scl=0. 
-      do 10 i=1,n 
-   10 scl=scl+a(i,i)**2 
-      scl=sqrt(scl)/float(n) 
-      do 20 i=1,n 
-      do 20 j=1,n 
-   20 a(i,j)=a(i,j)/scl 
-      do 30 i=1,n 
-      do 30 j=1,n 
-      v(i,j)=0. 
-      if(i.eq.j)v(i,j)=1. 
-   30 continue 
-      do 100 i=2,n 
-      do 100 j=1,i-1 
-  100 tes=tes+2.*a(i,j)*a(i,j) 
-      tes=sqrt(tes) 
-      m=0 
-  105 tes=tes/float(n) 
-      if(tes.lt.rho)tes=rho 
-  110 do 165 i=2,n 
-      do 165 j=1,i-1 
-      if(abs(a(i,j))-tes)165,115,115 
-  115 m=1 
-      v1=a(j,j) 
-      v2=a(i,j) 
-      v3=a(i,i) 
-      u=0.5*(v1-v3) 
-      if(abs(u)-rho)120,125,125 
-  120 omg=-1. 
-      go to 130 
-  125 omg=-v2/sqrt(v2*v2+u*u) 
-      if(u.lt.0.)omg=-omg 
-  130 s=omg/sqrt(2.*(1.+sqrt(1.-omg*omg))) 
-      c=sqrt(1.-s*s) 
-      do 160 k=1,n 
-      if(k-i)140,135,135 
-  135 tem=a(k,j)*c-a(k,i)*s 
-      a(k,i)=a(k,j)*s+a(k,i)*c 
-      a(k,j)=tem 
-      go to 155 
-  140 if(k-j)145,150,150 
-  145 tem=a(j,k)*c-a(i,k)*s 
-      a(i,k)=a(j,k)*s+a(i,k)*c 
-      a(j,k)=tem 
-      go to 155 
-  150 tem=a(k,j)*c-a(i,k)*s 
-      a(i,k)=a(k,j)*s+a(i,k)*c 
-      a(k,j)=tem 
-  155 tem=v(k,j)*c-v(k,i)*s 
-      v(k,i)=v(k,j)*s+v(k,i)*c 
-      v(k,j)=tem 
-  160 continue 
-      a(j,j)=v1*c*c+v3*s*s-2.*v2*s*c 
-      a(i,i)=v1*s*s+v3*c*c+2.*v2*s*c 
-      a(i,j)=(v1-v3)*s*c+v2*(c*c-s*s) 
-  165 continue 
-      if(m-1)175,170,170 
-  170 m=0 
-      go to 110 
-  175 if(tes-rho)180,180,105 
-  180 do 190 i=1,n 
-      do 190 j=1,n 
-  190 a(i,j)=scl*a(i,j) 
-      return 
-      end 
-
+end subroutine align
 
 
 

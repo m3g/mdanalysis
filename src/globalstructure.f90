@@ -457,8 +457,6 @@ end program globalstructure
 !  On return:
 !            x: the coordinates aligned
 !
-!  Requires: subroutine jacobi
-!
 !  Leandro Martinez, IQ-UNICAMP, 26/10/2005
 !
 
