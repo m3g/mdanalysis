@@ -45,7 +45,7 @@ all : $(BIN) \
       $(BIN)/align \
       $(BIN)/distance \
       $(BIN)/solvation \
-      $(BIN)/gss \
+      $(BIN)/gmd \
       $(BIN)/angles \
       $(BIN)/hbonds \
       $(BIN)/globalstructure \
@@ -117,18 +117,18 @@ $(BIN)/solvation.sh : $(SCR)/solvation-base.sh
 	chmod +x $(BIN)/solvation.sh
 
 #
-# gss module
+# gmd module
 #
 
-$(BIN)/gss : $(OBJ)/smalldistances.o $(OBJ)/common.o $(OBJ)/gss.o $(BIN)/gss.sh
-	$(FORTRAN) $(FLAGS) -o $(BIN)/gss $(OBJ)/gss.o $(OBJ)/common.o $(OBJ)/smalldistances.o
+$(BIN)/gmd : $(OBJ)/smalldistances.o $(OBJ)/common.o $(OBJ)/gmd.o $(BIN)/gmd.sh
+	$(FORTRAN) $(FLAGS) -o $(BIN)/gmd $(OBJ)/gmd.o $(OBJ)/common.o $(OBJ)/smalldistances.o
 
-$(OBJ)/gss.o : $(SRC)/gss.f90
-	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/gss.o $(SRC)/gss.f90
+$(OBJ)/gmd.o : $(SRC)/gmd.f90
+	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/gmd.o $(SRC)/gmd.f90
 
-$(BIN)/gss.sh : $(SCR)/gss-base.sh
-	sed 's!PWD!$(IDIR)!' $(SCR)/gss-base.sh > $(BIN)/gss.sh
-	chmod +x $(BIN)/gss.sh
+$(BIN)/gmd.sh : $(SCR)/gmd-base.sh
+	sed 's!PWD!$(IDIR)!' $(SCR)/gmd-base.sh > $(BIN)/gmd.sh
+	chmod +x $(BIN)/gmd.sh
 
 $(OBJ)/smalldistances.o : $(SRC)/smalldistances.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/smalldistances.o $(SRC)/smalldistances.f90

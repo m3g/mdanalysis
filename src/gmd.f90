@@ -1,5 +1,5 @@
 !
-! gss: A program to compute gss[1] radial distribution functions from
+! gmd: A program to compute gmd[1] radial distribution functions from
 !      molecular dynamics simulations in NAMD DCD format.
 !
 !      Important: THIS IS NOT THE CLASSICAL RADIAL DISTRIBUTION
@@ -79,8 +79,8 @@ program g_solute_solvent
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
                         lineformat
-  character(len=200) :: output, output_atom_phi,  &
-                        output_atom_kb, output_atom_gss_contrib, output_atom_phi_contrib
+  character(len=200) :: output, output_atom_gmd,  &
+                        output_atom_kb, output_atom_gss_contrib, output_atom_gmd_contrib
   character(len=4) :: dummyc
   logical :: readfromdcd, dcdaxis, periodic, onscreenprogress, usecutoff
   real :: shellradius, rshift
@@ -105,8 +105,8 @@ program g_solute_solvent
   real, allocatable :: md_count_random(:)
   real, allocatable :: md_atom_contribution(:,:)
 
-  ! This is the resulting phi (md_count/md_count_random)
-  real, allocatable :: phi(:) 
+  ! This is the resulting gmd (md_count/md_count_random)
+  real, allocatable :: gmd(:) 
 
   ! This is the resulting gss (md_count/bulkdensity)
   real, allocatable :: gss(:), gss_phantom(:)
@@ -114,13 +114,13 @@ program g_solute_solvent
   ! KB integral 
   real, allocatable :: kb(:)
 
-  ! These are the counts to compute the phi per atom
+  ! These are the counts to compute the gmd per atom
   real, allocatable :: site_count_atom(:,:)
   real, allocatable :: site_count_atom_random(:,:)
-  real, allocatable :: phi_atom(:,:), kb_atom(:,:)
+  real, allocatable :: gmd_atom(:,:), kb_atom(:,:)
 
-  ! This is to compute the atomic contributions to phi (md_atom_contribution/md_count_random)
-  real, allocatable :: phi_atom_contribution(:,:)
+  ! This is to compute the atomic contributions to gmd (md_atom_contribution/md_count_random)
+  real, allocatable :: gmd_atom_contribution(:,:)
 
   ! This is to compute the atomic contributions to gss (md_atom_contribution/bulkdensity)
   real, allocatable :: gss_atom_contribution(:,:)
@@ -289,8 +289,8 @@ program g_solute_solvent
   ! Names of auxiliary output files
   
   output_atom_gss_contrib = output(1:length(remove_extension(output)))//"-GSS_ATOM_CONTRIB."//file_extension(output)
-  output_atom_phi_contrib = output(1:length(remove_extension(output)))//"-PHI_ATOM_CONTRIB."//file_extension(output)
-  output_atom_phi = output(1:length(remove_extension(output)))//"-PHI_PERATOM."//file_extension(output)
+  output_atom_gmd_contrib = output(1:length(remove_extension(output)))//"-PHI_ATOM_CONTRIB."//file_extension(output)
+  output_atom_gmd = output(1:length(remove_extension(output)))//"-PHI_PERATOM."//file_extension(output)
   output_atom_kb = output(1:length(remove_extension(output)))//"-KB_PERATOM."//file_extension(output)
 
   ! Reading the header of psf file
@@ -348,9 +348,9 @@ program g_solute_solvent
   write(*,*) ' Width of histogram bins: ', binstep
   write(*,*) ' Number of bins of histograms: ', nbins
 
-  ! Allocate phi array according to nbins
+  ! Allocate gmd array according to nbins
 
-  allocate( phi(nbins), kb(nbins), &
+  allocate( gmd(nbins), kb(nbins), &
             gss(nbins), gss_phantom(nbins), &
             md_count(nbins), md_count_random(nbins), shellvolume(nbins) )
   
@@ -525,8 +525,8 @@ program g_solute_solvent
   allocate( site_count_atom(natoms_solvent,nbins), &
             site_count_atom_random(natoms_solvent,nbins), &
             kb_atom(natoms_solvent,nbins), &
-            phi_atom(natoms_solvent,nbins) )
-  allocate( phi_atom_contribution(natoms_solvent,nbins), & 
+            gmd_atom(natoms_solvent,nbins) )
+  allocate( gmd_atom_contribution(natoms_solvent,nbins), & 
             gss_atom_contribution(natoms_solvent,nbins), &
             md_atom_contribution(natoms_solvent,nbins) )
 
@@ -596,7 +596,7 @@ program g_solute_solvent
   simdensity = 0.e0
   av_totalvolume = 0.e0
 
-  ! Reading dcd file and computing the phi function
+  ! Reading dcd file and computing the gmd function
    
   iframe = 0
   do icycle = 1, ncycles 
@@ -635,7 +635,7 @@ program g_solute_solvent
       write(*,"(' Computing: ',f6.2,'%')",advance='no') 0.
     end if
   
-    ! Computing the phi function
+    ! Computing the gmd function
   
     iatom = 0
     do kframe = 1, nfrcycle
@@ -696,7 +696,7 @@ program g_solute_solvent
       end do
 
       !
-      ! Computing the phi functions from distance data
+      ! Computing the gmd functions from distance data
       !
 
       ! For each solvent residue, get the MINIMUM distance to the solute
@@ -709,7 +709,7 @@ program g_solute_solvent
         mind_atom(i) = cutoff + 1.e0
       end do
       do i = 1, nsmalld
-        ! Counting for computing the whole-molecule phi 
+        ! Counting for computing the whole-molecule gmd 
         isolvent = irsolv(ismalld(i))
         if ( dsmalld(i) < mind_mol(isolvent) ) then
           mind_mol(isolvent) = dsmalld(i)
@@ -717,13 +717,13 @@ program g_solute_solvent
           if ( j == 0 ) j = natoms_solvent
           imind(isolvent) = j
         end if
-        ! Counting for computing atom-specific phi
+        ! Counting for computing atom-specific gmd
         if ( dsmalld(i) < mind_atom(ismalld(i)) ) then
           mind_atom(ismalld(i)) = dsmalld(i)
         end if
       end do
 
-      ! Summing up current data to the phi histogram
+      ! Summing up current data to the gmd histogram
 
       do i = 1, nrsolvent
         irad = int(float(nbins)*mind_mol(i)/cutoff)+1
@@ -1008,14 +1008,14 @@ program g_solute_solvent
     ! PHI distributions
 
     if ( md_count_random(i) > 0.e0 ) then
-      phi(i) = md_count(i)/md_count_random(i)
+      gmd(i) = md_count(i)/md_count_random(i)
       do j = 1, natoms_solvent
-        phi_atom_contribution(j,i) = md_atom_contribution(j,i)/md_count_random(i)
+        gmd_atom_contribution(j,i) = md_atom_contribution(j,i)/md_count_random(i)
       end do
     else
-      phi(i) = 0.e0
+      gmd(i) = 0.e0
       do j = 1, natoms_solvent
-        phi_atom_contribution(j,i) = 0.e0
+        gmd_atom_contribution(j,i) = 0.e0
       end do
     end if
 
@@ -1040,9 +1040,9 @@ program g_solute_solvent
       site_count_atom(j,i) = site_count_atom(j,i) / frames
       site_count_atom_random(j,i) = density_fix*site_count_atom_random(j,i) / frames
       if ( site_count_atom_random(j,i) > 0.e0 ) then
-        phi_atom(j,i) = site_count_atom(j,i) / site_count_atom_random(j,i)
+        gmd_atom(j,i) = site_count_atom(j,i) / site_count_atom_random(j,i)
       else
-        phi_atom(j,i) = 0.e0
+        gmd_atom(j,i) = 0.e0
       end if
     end do
 
@@ -1091,31 +1091,31 @@ program g_solute_solvent
   if ( usecutoff ) then
     bulkerror = 0.e0
     do i = ibulk, nbins
-      bulkerror = bulkerror + phi(i)
+      bulkerror = bulkerror + gmd(i)
     end do
     bulkerror = bulkerror / ( nbins-ibulk+1 )
     do i = ibulk, nbins
-      sdbulkerror = (bulkerror - phi(i))**2
+      sdbulkerror = (bulkerror - gmd(i))**2
     end do
     sdbulkerror = sqrt(sdbulkerror/(nbins-ibulk+1))
     write(*,*)
-    write(*,"('  Average and standard deviation of bulk-phi: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
+    write(*,"('  Average and standard deviation of bulk-gmd: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
     write(20,"('#')")
-    write(20,"('# Average and standard deviation of bulk-phi: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
+    write(20,"('# Average and standard deviation of bulk-gmd: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
   else
     bulkerror = 0.e0
     do i = nbins-int(1./binstep), nbins
-      bulkerror = bulkerror + phi(i)
+      bulkerror = bulkerror + gmd(i)
     end do
     bulkerror = bulkerror / ( int(1./binstep)+1 )
     do i = nbins-int(1./binstep), nbins
-      sdbulkerror = (bulkerror - phi(i))**2
+      sdbulkerror = (bulkerror - gmd(i))**2
     end do
     sdbulkerror = sqrt(sdbulkerror/(int(1./binstep)+1))
     write(*,*)
-    write(*,"('  Average and standard deviation of long range (dbulk-1.) phi: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
+    write(*,"('  Average and standard deviation of long range (dbulk-1.) gmd: ',f12.5,' +/-',f12.5 )") bulkerror, sdbulkerror 
     write(20,"('#')")
-    write(20,"('# Average and standard deviation of long range (dbulk-1.) phi: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
+    write(20,"('# Average and standard deviation of long range (dbulk-1.) gmd: ',f12.5,'+/-',f12.5 )") bulkerror, sdbulkerror 
   end if
 
   ! Output table
@@ -1174,7 +1174,7 @@ program g_solute_solvent
 
     write(20,lineformat) &
     shellradius(i,binstep),&                                      !  1-DISTANCE
-    phi(i),&                                                      !  2-PHI
+    gmd(i),&                                                      !  2-PHI
     gss(i),&                                                      !  3-GSS
     gss_phantom(i),&                                              !  4-GSS PHANTOM
     md_count(i),&                                                 !  5-SITE COUNT
@@ -1212,9 +1212,9 @@ program g_solute_solvent
   end do
   close(20)
 
-  ! Writting phi per atom contributions 
+  ! Writting gmd per atom contributions 
 
-  open(20,file=output_atom_phi_contrib)
+  open(20,file=output_atom_gmd_contrib)
   write(20,"(a)") "# Total PHI contribution per atom. "
   write(20,"( '#',/,&
              &'# Input file: ',a,/,& 
@@ -1231,13 +1231,13 @@ program g_solute_solvent
   write(20,lineformat) (i,i=1,natoms_solvent)
   write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
   do i = 1, nbins
-    write(20,lineformat) shellradius(i,binstep), phi(i), (phi_atom_contribution(j,i),j=1,natoms_solvent)
+    write(20,lineformat) shellradius(i,binstep), gmd(i), (gmd_atom_contribution(j,i),j=1,natoms_solvent)
   end do
   close(20)
 
   ! Writting independent atomic PHIs 
 
-  open(20,file=output_atom_phi)
+  open(20,file=output_atom_gmd)
   write(20,"(a)") "# Indepdendent PHI for each atom "
   write(20,"( '#',/,&
              &'# Input file: ',a,/,& 
@@ -1254,7 +1254,7 @@ program g_solute_solvent
   write(20,lineformat) (i,i=1,natoms_solvent)
   write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
   do i = 1, nbins
-    write(20,lineformat) shellradius(i,binstep), phi(i), (phi_atom(j,i),j=1,natoms_solvent)
+    write(20,lineformat) shellradius(i,binstep), gmd(i), (gmd_atom(j,i),j=1,natoms_solvent)
   end do
   close(20)
 
@@ -1289,10 +1289,10 @@ program g_solute_solvent
   write(*,*)
   write(*,*) ' OUTPUT FILES: ' 
   write(*,*)
-  write(*,*) ' Wrote atomic PHI to file: ', trim(adjustl(output_atom_phi)) 
+  write(*,*) ' Wrote atomic PHI to file: ', trim(adjustl(output_atom_gmd)) 
   write(*,*) ' Wrote atomic KB to file: ', trim(adjustl(output_atom_kb)) 
   write(*,*) ' Wrote atomic GSS contributions to file: ', trim(adjustl(output_atom_gss_contrib))
-  write(*,*) ' Wrote atomic PHI contributions to file: ', trim(adjustl(output_atom_phi_contrib))
+  write(*,*) ' Wrote atomic PHI contributions to file: ', trim(adjustl(output_atom_gmd_contrib))
   write(*,*)
   write(*,*) ' Wrote main output file: ', trim(adjustl(output))
   write(*,*)

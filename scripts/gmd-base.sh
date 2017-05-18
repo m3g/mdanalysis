@@ -1,30 +1,30 @@
 #!/bin/bash
 #
-# gss.sh: Reads the input file for the gss program using
+# gmd.sh: Reads the input file for the gmd program using
 #         VMD selection style. Than runs VMD to build a temporary
 #         pdb file (as namdenergy does) and writes a temporary
-#         input file for the gss program. Finally, runs 
-#         the gss program.
+#         input file for the gmd program. Finally, runs 
+#         the gmd program.
 #
-#  Run with: ./gss.sh gss.inp
+#  Run with: ./gmd.sh gmd.inp
 #
 #  L. Martinez, Institut Pasteur, Apr 22, 2008.
 #
 #  Version 17.137
 #
 # IMPORTANT:
-# Path for gss program:
+# Path for gmd program:
 #
-gss=PWD/bin/gss
+gmd=PWD/bin/gmd
 #
-if [ ! -e $gss ]; then
-  echo " ERROR: The gss executable is not in the specified "
+if [ ! -e $gmd ]; then
+  echo " ERROR: The gmd executable is not in the specified "
   echo "        path. Modify the path to the executable in the "
-  echo "        gss.sh script. "
+  echo "        gmd.sh script. "
   exit
 fi
 
-# Read gss input file and extract relevant data
+# Read gmd input file and extract relevant data
 
 file=$1
 while read line; do
@@ -48,7 +48,7 @@ fi
 # Write VMD input file
 
 vmdfile=$output.vmdtemp
-groups=$output.gsstemp
+groups=$output.gmdtemp
 echo "
 set psf $psf
 set dcd $dcd
@@ -98,27 +98,27 @@ vmd -dispdev text < $vmdfile > $vmdfile.log
 
 grep "ERROR" $vmdfile.log
 
-# Write the temporary gss input file pointing to the group definitions
+# Write the temporary gmd input file pointing to the group definitions
 
-gssinput=$output.gssinp
-echo "#" > $gssinput
+gmdinput=$output.gmdinp
+echo "#" > $gmdinput
 while read line; do
   keyword=`echo $line | awk '{print $1}'`
   case $keyword in
-    solute | reference ) echo "groups $groups" >> $gssinput ;;
+    solute | reference ) echo "groups $groups" >> $gmdinput ;;
     solvent | groups ) ;;
     exclude | groups ) ;;
-    * ) echo $line >> $gssinput ;;
+    * ) echo $line >> $gmdinput ;;
   esac  
 done < <(cat $file)   
 
-# Run gss program
+# Run gmd program
 
-$gss $gssinput
+$gmd $gmdinput
 
 # Erase temporary files
 
-rm -f $gssinput
+rm -f $gmdinput
 rm -f $vmdfile
 rm -f $vmdfile.log
 rm -f $groups
