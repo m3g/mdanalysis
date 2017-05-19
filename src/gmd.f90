@@ -558,6 +558,7 @@ program g_solute_solvent
   write(*,*)
   write(*,*) ' Number of atoms as specified in the dcd file: ', ntotat     
   call getnframes(10,nframes,dcdaxis,lastframe)
+  if( lastframe == 0 ) lastframe = nframes
   if(ntotat /= natom) then
     write(*,"(a,/,a)") ' ERROR: Number of atoms in the dcd file does not',&
                       &'        match the number of atoms in the psf file'

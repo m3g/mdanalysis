@@ -322,7 +322,7 @@ do
   if(line(1:4) == 'ATOM' .or. line(1:6) == 'HETATM') then 
     iatom = iatom + 1
 
-! Read atoms belonging to reference
+  ! Read atoms belonging to reference
 
     if(line(57:60) == '1.00') then      
       n_reference = n_reference + 1        
@@ -330,7 +330,7 @@ do
       mass1 = mass1 + mass(iatom)
     end if
 
-! Read atoms belonging to compute_rmsd_of
+    ! Read atoms belonging to compute_rmsd_of
 
     if(line(63:66) == '2.00') then
       n_rmsd = n_rmsd + 1        

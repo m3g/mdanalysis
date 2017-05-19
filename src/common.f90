@@ -821,9 +821,8 @@ subroutine getnframes(iunit,nframes,dcdaxis,lastframe)
 
   write(*,*) ' Total number of frames to read in this dcd file: ', nframes
   if(nframes < lastframe) then
-    write(*,*) ' WARNING: lastframe greater than the number of frames of the dcd file. '
+    write(*,*) ' WARNING: lastframe greater than the number of frames of this dcd file. '
   end if
-  if(lastframe == 0) lastframe = nframes
 
 end subroutine getnframes
 
