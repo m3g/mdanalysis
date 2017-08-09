@@ -1,5 +1,5 @@
 #
-# Example input file for gss.f90
+# Example input file for gmd.f90
 #
 # Version 17.221
 #
@@ -9,7 +9,7 @@ psf ./production.psf
 dcd ./production.dcd
 
 # Group definitions: group1 and group2 can be VMD-style selections
-# if the program is running from the gss.sh script (and VMD is available)
+# if the program is running from the gmd.sh script (and VMD is available)
 solute segname BGLC
 solvent resname TIP3 and name OH2
 
@@ -18,7 +18,7 @@ solvent resname TIP3 and name OH2
 #groups ./teste.pdb
 
 # Output GSS file:
-output gss.dat
+output gmd.dat
 
 # Options to consider frames
 firstframe 1
