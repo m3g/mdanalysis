@@ -10,7 +10,7 @@
 #
 #  L. Martinez, Institut Pasteur, Apr 02, 2008.
 #
-#  Version 17.138
+#  Version 17.221
 #
 # IMPORTANT:
 # Path for align program: modify if not in the current directory
