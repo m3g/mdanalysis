@@ -148,7 +148,7 @@ program g_solute_solvent
   
   write(*,"(/,' ####################################################',&
             &/,/,&
-            & '   GSS: Compute gss distribution from DCD files      ',&
+            & '   GMD: Compute gmd distribution from DCD files      ',&
             &/,/,&
             & ' ####################################################',/)")    
   
@@ -263,7 +263,7 @@ program g_solute_solvent
       end if 
     else if(keyword(record) == 'output') then
       output = value(record)
-      write(*,*) ' GSS output file name: ', output(1:length(output))
+      write(*,*) ' GMD output file name: ', output(1:length(output))
     else if(keyword(record) == 'solute' .or. &
             keyword(record) == 'solvent') then
       write(*,"(a,/,a)") ' ERROR: The options solute and solvent must be used ',&
@@ -288,7 +288,7 @@ program g_solute_solvent
 
   ! Names of auxiliary output files
   
-  output_atom_gss_contrib = output(1:length(remove_extension(output)))//"-GSS_ATOM_CONTRIB."//file_extension(output)
+  output_atom_gss_contrib = output(1:length(remove_extension(output)))//"-GMD_ATOM_CONTRIB."//file_extension(output)
   output_atom_gmd_contrib = output(1:length(remove_extension(output)))//"-PHI_ATOM_CONTRIB."//file_extension(output)
   output_atom_gmd = output(1:length(remove_extension(output)))//"-PHI_PERATOM."//file_extension(output)
   output_atom_kb = output(1:length(remove_extension(output)))//"-KB_PERATOM."//file_extension(output)
@@ -1020,7 +1020,7 @@ program g_solute_solvent
       end do
     end if
 
-    ! GSS distributions
+    ! GMD distributions
 
     if ( shellvolume(i) > 0.e0 ) then
       gss(i) = md_count(i)/(bulkdensity*shellvolume(i))
@@ -1123,9 +1123,9 @@ program g_solute_solvent
 
   write(20,"( '# COLUMNS CORRESPOND TO: ',/,&
   &'#       1  Minimum distance to solute (dmin)',/,&
-  &'#       2  PHI distribution, normalized by phantom-solute distribution. ',/,&
-  &'#       3  GSS distribution, normalized by bulk density ',/,&
-  &'#       4  GSS PHANTOM distribution, normalized by bulk density ',/,&
+  &'#       2  GMD distribution, normalized by phantom-solute distribution. ',/,&
+  &'#       3  GMD distribution, normalized by bulk density ',/,&
+  &'#       4  GMD PHANTOM distribution, normalized by bulk density ',/,&
   &'#       5  Site count for each dmin (PHI without normalization).',/,&
   &'#       6  Site count for ideal gas distribution.',/,&
   &'#       7  Shell volume associated with each dmin. ',/,&
@@ -1135,7 +1135,7 @@ program g_solute_solvent
   &'#      11  Kirwood-Buff integral (cc/mol) computed from column 3 with spherical shell volume (int 4*pi*r^2*(gss-1) dr ',/,&
   &'#      12  Spherical-shifted minimum distance ')")
   write(20,"('#')")
-  write(20,"('#   1-DISTANCE         2-PHI         3-GSS 4-GSS PHANTOM  5-SITE COUNT  6-COUNT RAND&
+  write(20,"('#   1-DISTANCE         2-GMD         3-GMD 4-GMD PHANTOM  5-SITE COUNT  6-COUNT RAND&
             &   7-SHELL VOL  8-SPHERE VOL  9-PHI/SPHERE     10-KB INT  11-KB SPHERE     12-RSHIFT')")
 
   do i = 1, nbins
@@ -1175,9 +1175,9 @@ program g_solute_solvent
 
     write(20,lineformat) &
     shellradius(i,binstep),&                                      !  1-DISTANCE
-    gmd(i),&                                                      !  2-PHI
-    gss(i),&                                                      !  3-GSS
-    gss_phantom(i),&                                              !  4-GSS PHANTOM
+    gmd(i),&                                                      !  2-GMD
+    gss(i),&                                                      !  3-GMD BULK DENSITY
+    gss_phantom(i),&                                              !  4-GMD PHANTOM
     md_count(i),&                                                 !  5-SITE COUNT
     md_count_random(i),&                                          !  6-COUNT RAND
     shellvolume(i),&                                              !  7-SHELL VOL
@@ -1193,7 +1193,7 @@ program g_solute_solvent
   ! Writting gss per atom contributions 
 
   open(20,file=output_atom_gss_contrib)
-  write(20,"(a)") "# Total GSS contribution per atom. "
+  write(20,"(a)") "# Total GMD contribution per atom. "
   write(20,"( '#',/,&
              &'# Input file: ',a,/,& 
              &'# DCD file: ',a,/,& 
@@ -1205,7 +1205,7 @@ program g_solute_solvent
     write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solvent(i)), classat(solvent(i)), mass(solvent(i))
   end do
   write(20,"(a)") "#"
-  write(lineformat,*) "('#',t7,'DISTANCE     GSS TOTAL',",natoms_solvent,"(tr2,i12) )"
+  write(lineformat,*) "('#',t7,'DISTANCE     GMD TOTAL',",natoms_solvent,"(tr2,i12) )"
   write(20,lineformat) (i,i=1,natoms_solvent)
   write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
   do i = 1, nbins
@@ -1292,7 +1292,7 @@ program g_solute_solvent
   write(*,*)
   write(*,*) ' Wrote atomic PHI to file: ', trim(adjustl(output_atom_gmd)) 
   write(*,*) ' Wrote atomic KB to file: ', trim(adjustl(output_atom_kb)) 
-  write(*,*) ' Wrote atomic GSS contributions to file: ', trim(adjustl(output_atom_gss_contrib))
+  write(*,*) ' Wrote atomic GMD contributions to file: ', trim(adjustl(output_atom_gss_contrib))
   write(*,*) ' Wrote atomic PHI contributions to file: ', trim(adjustl(output_atom_gmd_contrib))
   write(*,*)
   write(*,*) ' Wrote main output file: ', trim(adjustl(output))
