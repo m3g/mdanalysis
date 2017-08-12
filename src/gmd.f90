@@ -1079,8 +1079,9 @@ program g_minimum_distance
   write(20,"('#')") 
   write(20,"('#   1-DISTANCE         2-GMD      3-KB INT    4-MD COUNT  5-COUNT RAND      6-SUM MD    7-SUM RAND   8-SHELL VOL')")
 
+  md_sum = 0.e0
+  md_sum_random = 0.e0
   do i = 1, nbins
-    kb(i) = 0.e0
 
     ! Simple sums
 
@@ -1089,7 +1090,7 @@ program g_minimum_distance
 
     ! KB integrals 
 
-    kb(i) = kb(i) + convert*(1.e0/bulkdensity)*(md_sum - md_sum_random)
+    kb(i) = convert*(1.e0/bulkdensity)*(md_sum - md_sum_random)
 
     lineformat = "("
     lineformat = trim(adjustl(lineformat))//"tr2,"//format(shellradius(i,binstep))
