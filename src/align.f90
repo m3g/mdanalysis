@@ -1001,7 +1001,7 @@ subroutine align(n_align,i_align,iatom,cmx,cmy,cmz,xdcd,ydcd,zdcd,&
   implicit none
   integer :: i, j, iq, n_align, i_align(*), iatom, ii
   real :: xdcd(*), ydcd(*), zdcd(*), xref(*), yref(*), zref(*)
-  real :: cmx, cmy, cmz, u(3,3), a(4,4), q(4,4), qmin,&
+  real :: cmx, cmy, cmz, u(3,3), a(4,4), q(4,4),&
           xm(*), ym(*), zm(*), xp(*), yp(*), zp(*),&
           cmxr, cmyr, cmzr
   

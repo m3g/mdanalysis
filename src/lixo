@@ -1,0 +1,107 @@
+gfortran -Wall -fcheck=bounds -c -o ../obj/gmd.o ./gmd.f90
+./gmd.f90:1100:67:
+
+     lineformat = lineformat//"tr2,"//format(shellradius(i,binstep))
+                                                                   1
+Warning: CHARACTER expression will be truncated in assignment (200/209) at (1) [-Wcharacter-truncation]
+./gmd.f90:1101:52:
+
+     lineformat = lineformat//",tr2,"//format(gmd(i))
+                                                    1
+Warning: CHARACTER expression will be truncated in assignment (200/210) at (1) [-Wcharacter-truncation]
+./gmd.f90:1102:51:
+
+     lineformat = lineformat//",tr2,"//format(kb(i))
+                                                   1
+Warning: CHARACTER expression will be truncated in assignment (200/210) at (1) [-Wcharacter-truncation]
+./gmd.f90:1103:57:
+
+     lineformat = lineformat//",tr2,"//format(md_count(i))
+                                                         1
+Warning: CHARACTER expression will be truncated in assignment (200/210) at (1) [-Wcharacter-truncation]
+./gmd.f90:1104:64:
+
+     lineformat = lineformat//",tr2,"//format(md_count_random(i))
+                                                                1
+Warning: CHARACTER expression will be truncated in assignment (200/210) at (1) [-Wcharacter-truncation]
+./gmd.f90:1105:55:
+
+     lineformat = lineformat//",tr2,"//format(md_sum(i))
+                                                       1
+Warning: CHARACTER expression will be truncated in assignment (200/210) at (1) [-Wcharacter-truncation]
+./gmd.f90:1106:62:
+
+     lineformat = lineformat//",tr2,"//format(md_sum_random(i))
+                                                              1
+Warning: CHARACTER expression will be truncated in assignment (200/210) at (1) [-Wcharacter-truncation]
+./gmd.f90:1107:77:
+
+     lineformat = lineformat//",tr2,"//format(sphericalshellvolume(i,binstep))
+                                                                             1
+Warning: CHARACTER expression will be truncated in assignment (200/210) at (1) [-Wcharacter-truncation]
+./gmd.f90:1108:32:
+
+     lineformat = lineformat//")"
+                                1
+Warning: CHARACTER expression will be truncated in assignment (200/201) at (1) [-Wcharacter-truncation]
+./gmd.f90:86:29:
+
+   real :: shellradius, rshift
+                             1
+Warning: Unused variable ‘rshift’ declared at (1) [-Wunused-variable]
+./gmd.f90:87:59:
+
+   real :: sphericalshellvolume, sphereradiusfromshellvolume
+                                                           1
+Warning: Unused variable ‘sphereradiusfromshellvolume’ declared at (1) [-Wunused-variable]
+sed 's!PWD!/home/leandro/programs/mdanalysis!' ../scripts/gmd-base.sh > ../bin/gmd.sh
+chmod +x ../bin/gmd.sh
+gfortran -Wall -fcheck=bounds -o ../bin/gmd ../obj/gmd.o ../obj/common.o ../obj/smalldistances.o
+gfortran -Wall -fcheck=bounds -c -o ../obj/angles.o ./angles.f90
+sed 's!PWD!/home/leandro/programs/mdanalysis!' ../scripts/angles-base.sh > ../bin/angles.sh
+chmod +x ../bin/angles.sh
+gfortran -Wall -fcheck=bounds -o ../bin/angles ../obj/angles.o ../obj/common.o
+gfortran -Wall -fcheck=bounds -c -o ../obj/hbonds.o ./hbonds.f90
+sed 's!PWD!/home/leandro/programs/mdanalysis!' ../scripts/hbonds-base.sh > ../bin/hbonds.sh
+chmod +x ../bin/hbonds.sh
+gfortran -Wall -fcheck=bounds -o ../bin/hbonds ../obj/hbonds.o ../obj/common.o
+gfortran -Wall -fcheck=bounds -c -o ../obj/globalstructure.o ./globalstructure.f90
+gfortran -Wall -fcheck=bounds -o ../bin/globalstructure ../obj/globalstructure.o ../obj/common.o -llapack
+gfortran -Wall -fcheck=bounds -c -o ../obj/jarzynski.o ./jarzynski.f90
+gfortran -Wall -fcheck=bounds -o ../bin/jarzynski ../obj/jarzynski.o ../obj/common.o
+gfortran -Wall -fcheck=bounds -c -o ../obj/tcf.o ./tcf.f90
+gfortran -Wall -fcheck=bounds -o ../bin/tcf ../obj/tcf.o ../obj/common.o
+gfortran -Wall -fcheck=bounds -c -o ../obj/fitexp.o ./fitexp.f90
+./fitexp.f90:438:24:
+
+ subroutine evalc(n,x,ind,c,flag)
+                        1
+Warning: Unused dummy argument ‘ind’ at (1) [-Wunused-dummy-argument]
+./fitexp.f90:457:26:
+
+ subroutine evaljac(n,x,ind,jcvar,jcval,jcnnz,flag)
+                          1
+Warning: Unused dummy argument ‘ind’ at (1) [-Wunused-dummy-argument]
+./fitexp.f90:457:22:
+
+ subroutine evaljac(n,x,ind,jcvar,jcval,jcnnz,flag)
+                      1
+Warning: Unused dummy argument ‘x’ at (1) [-Wunused-dummy-argument]
+gfortran -O3 -ffast-math -c -o ../obj/algencan-pocket.o ./algencan-pocket.f
+gfortran -O3 -ffast-math -o ../bin/fitexp ../obj/fitexp.o \
+                                                ../obj/common.o \
+                                                ../obj/algencan-pocket.o
+gfortran -Wall -fcheck=bounds -c -o ../obj/histogram.o ./histogram.f90
+gfortran -Wall -fcheck=bounds -o ../bin/histogram ../obj/histogram.o ../obj/common.o
+gfortran -Wall -fcheck=bounds -c -o ../obj/perresidueavg.o ./perresidueavg.f90
+gfortran -Wall -fcheck=bounds -o ../bin/perresidueavg ../obj/perresidueavg.o
+gfortran -Wall -fcheck=bounds -c -o ../obj/lifetime.o ./lifetime.f90
+gfortran -Wall -fcheck=bounds -o ../bin/lifetime ../obj/lifetime.o
+gfortran -Wall -fcheck=bounds -c -o ../obj/data_average.o ./data_average.f90
+gfortran -Wall -fcheck=bounds -o ../bin/data_average ../obj/data_average.o ../obj/common.o
+ ------------------------------------------------------ 
+ Compilation finished successfully. 
+ IMPORTANT: If the programs won't run in the mdanalysi/bin 
+ directory, change the paths in each .sh script or
+ remake all in the actual running directory.
+ ------------------------------------------------------ 

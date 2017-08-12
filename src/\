@@ -73,7 +73,7 @@ program g_minimum_distance
   real :: dummyr, xdcd(memory), ydcd(memory), zdcd(memory),&
           time0, etime, tarray(2),&
           binstep, cutoff, &
-          bulkdensity_at_frame
+          kbintsphere, bulkdensity_at_frame
   real :: bulkdensity, totalvolume, bulkvolume, simdensity, solutevolume, av_totalvolume
   real :: bulkerror, sdbulkerror
   character(len=200) :: groupfile, line, record, value, keyword,&
@@ -83,7 +83,8 @@ program g_minimum_distance
   character(len=4) :: dummyc
   character(len=5) :: format
   logical :: readfromdcd, dcdaxis, periodic, onscreenprogress, usecutoff
-  real :: shellradius
+  real :: shellradius, rshift
+  real :: sphericalshellvolume, sphereradiusfromshellvolume
 
   real :: beta, gamma, theta, cmx, cmy, cmz
 
@@ -103,8 +104,8 @@ program g_minimum_distance
   real, allocatable :: md_count(:)
   real, allocatable :: md_count_random(:)
   real, allocatable :: md_atom_contribution(:,:)
-  real :: md_sum
-  real :: md_sum_random
+  real, allocatable :: md_sum(:) 
+  real, allocatable :: md_sum_random(:)
 
   ! This is the resulting gmd (md_count/md_count_random)
   real, allocatable :: gmd(:) 
@@ -338,8 +339,7 @@ program g_minimum_distance
   ! Allocate gmd array according to nbins
 
   allocate( gmd(nbins), kb(nbins), &
-            md_count(nbins), md_count_random(nbins), &
-            shellvolume(nbins) )
+            md_count(nbins), md_count_random(nbins), shellvolume(nbins) )
   
   ! Check for simple input errors
   
@@ -735,7 +735,7 @@ program g_minimum_distance
           irad = int(float(nbins)*mind_atom(i)/cutoff)+1
           j = mod(i,natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
-          if ( j == irefatom .and. irad > nbins ) nbulk = nbulk + 1
+          if ( j == irefatom ) nbulk = nbulk + 1
         end do
       end if
 
@@ -1081,26 +1081,31 @@ program g_minimum_distance
 
   do i = 1, nbins
     kb(i) = 0.e0
+    md_sum(i) = 0.e0
+    md_sum_random(i) = 0.e0
+  end do
+  kbintsphere = 0.e0
+  do i = 1, nbins
 
     ! Simple sums
 
-    md_sum = md_sum + md_count(i)
-    md_sum_random = md_sum_random + md_count_random(i)
+    md_sum(i) = md_sum(i) + md_count(i)
+    md_sum_random(i) = md_sum_random(i) + md_count_random(i)
 
     ! KB integrals 
 
-    kb(i) = kb(i) + convert*(1.e0/bulkdensity)*(md_sum - md_sum_random)
+    kb(i) = kb(i) + convert*(1.e0/bulkdensity)*(md_sum(i) - md_sum_random(i))
 
     lineformat = "("
-    lineformat = trim(adjustl(lineformat))//"tr2,"//format(shellradius(i,binstep))
-    lineformat = trim(adjustl(lineformat))//",tr2,"//format(gmd(i))
-    lineformat = trim(adjustl(lineformat))//",tr2,"//format(kb(i))
-    lineformat = trim(adjustl(lineformat))//",tr2,"//format(md_count(i))
-    lineformat = trim(adjustl(lineformat))//",tr2,"//format(md_count_random(i))
-    lineformat = trim(adjustl(lineformat))//",tr2,"//format(md_sum)
-    lineformat = trim(adjustl(lineformat))//",tr2,"//format(md_sum_random)
-    lineformat = trim(adjustl(lineformat))//",tr2,"//format(shellvolume(i))
-    lineformat = trim(adjustl(lineformat))//")"
+    lineformat = lineformat//"tr2,"//format(shellradius(i,binstep))
+    lineformat = lineformat//",tr2,"//format(gmd(i))
+    lineformat = lineformat//",tr2,"//format(kb(i))
+    lineformat = lineformat//",tr2,"//format(md_count(i))
+    lineformat = lineformat//",tr2,"//format(md_count_random(i))
+    lineformat = lineformat//",tr2,"//format(md_sum(i))
+    lineformat = lineformat//",tr2,"//format(md_sum_random(i))
+    lineformat = lineformat//",tr2,"//format(sphericalshellvolume(i,binstep))
+    lineformat = lineformat//")"
 
     write(20,lineformat) &
     shellradius(i,binstep),&                                      !  1-DISTANCE
@@ -1108,9 +1113,9 @@ program g_minimum_distance
     kb(i),&                                                       !  3-KB INT
     md_count(i),&                                                 !  4-MD COUNT
     md_count_random(i),&                                          !  5-COUNT RAND
-    md_sum,&                                                      !  6-SUM MD
-    md_sum_random,&                                               !  7-SUM RAND
-    shellvolume(i)                                                !  8-SHELL VOL
+    md_sum(i),&                                                   !  6-SUM MD
+    md_sum_random(i),&                                            !  7-SUM RAND
+    sphericalshellvolume(i,binstep)                               !  8-SHELL VOL
 
   end do
   close(20)
@@ -1240,7 +1245,7 @@ function format(x)
   character(len=5) :: format
   real :: x
 
-  if ( abs(x) < 999e0 ) then
+  if ( abs(x) > 999e0 ) then
     format = 'f12.7'
   else
     format = 'e12.5'
