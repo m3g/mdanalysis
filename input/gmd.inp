@@ -17,7 +17,7 @@ solvent resname TIP3 and name OH2
 # and "1.00" in the occupancy factor for the excluded selection.
 #groups ./teste.pdb
 
-# Output GSS file:
+# Output GMD file:
 output gmd.dat
 
 # Options to consider frames
