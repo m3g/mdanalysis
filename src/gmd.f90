@@ -1008,7 +1008,7 @@ program g_minimum_distance
              &'# DCD file: ',a,/,& 
              &'# Group file: ',a,/,&
              &'# PSF file: ',a,/,& 
-             &'# First frame: ',i5,' Last frame: ',i5,' Stride: ',i5,/,&
+             &'# First frame: ',i7,' Last frame: ',i7,' Stride: ',i7,/,&
              &'#',/,&
              &'# Periodic boundary conditions: ',/,&
              &'# Periodic: ',l1,' Read from DCD: ',l1,/,&
@@ -1020,10 +1020,10 @@ program g_minimum_distance
              &'#',/,&
              &'# Solute partial volume estimate (cc/mol): ',f12.5,/,&
              &'#',/,&
-             &'# Number of atoms and mass of group 1: ',i6,f12.3,/,&
-             &'# First and last atoms of group 1: ',i6,tr1,i6,/,&
-             &'# Number of atoms and mass of group 2: ',i6,f12.3,/,&
-             &'# First and last atoms of group 2: ',i6,tr1,i6,/,&
+             &'# Number of atoms and mass of group 1: ',i7,f12.3,/,&
+             &'# First and last atoms of group 1: ',i7,tr1,i7,/,&
+             &'# Number of atoms and mass of group 2: ',i7,f12.3,/,&
+             &'# First and last atoms of group 2: ',i7,tr1,i7,/,&
              &'#' )" )&
              &inputfile(1:length(inputfile)),&
              &dcdfile(1:length(dcdfile)),&
