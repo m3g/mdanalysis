@@ -646,7 +646,7 @@ program g_minimum_distance
       end if
 
       !
-      ! Computing the PHI data the simulation
+      ! Computing the GMD data the simulation
       !
 
       do i = 1, nsolute
@@ -1154,7 +1154,7 @@ program g_minimum_distance
     write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solvent(i)), classat(solvent(i)), mass(solvent(i))
   end do
   write(20,"(a)") "#"
-  write(lineformat,*) "('#',t7,'DISTANCE     PHI TOTAL',",natoms_solvent,"(tr2,i12) )"
+  write(lineformat,*) "('#',t7,'DISTANCE     GMD TOTAL',",natoms_solvent,"(tr2,i12) )"
   write(20,lineformat) (i,i=1,natoms_solvent)
   write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
   do i = 1, nbins
