@@ -46,6 +46,7 @@ all : $(BIN) \
       $(BIN)/distance \
       $(BIN)/solvation \
       $(BIN)/gmd \
+      $(BIN)/gmd2 \
       $(BIN)/angles \
       $(BIN)/hbonds \
       $(BIN)/globalstructure \
@@ -129,6 +130,23 @@ $(OBJ)/gmd.o : $(SRC)/gmd.f90
 $(BIN)/gmd.sh : $(SCR)/gmd-base.sh
 	sed 's!PWD!$(IDIR)!' $(SCR)/gmd-base.sh > $(BIN)/gmd.sh
 	chmod +x $(BIN)/gmd.sh
+
+$(OBJ)/smalldistances.o : $(SRC)/smalldistances.f90
+	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/smalldistances.o $(SRC)/smalldistances.f90
+
+#
+# gmd2 module
+#
+
+$(BIN)/gmd2 : $(OBJ)/smalldistances.o $(OBJ)/common.o $(OBJ)/gmd2.o $(BIN)/gmd2.sh
+	$(FORTRAN) $(FLAGS) -o $(BIN)/gmd2 $(OBJ)/gmd2.o $(OBJ)/common.o $(OBJ)/smalldistances.o
+
+$(OBJ)/gmd2.o : $(SRC)/gmd2.f90
+	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/gmd2.o $(SRC)/gmd2.f90
+
+$(BIN)/gmd2.sh : $(SCR)/gmd2-base.sh
+	sed 's!PWD!$(IDIR)!' $(SCR)/gmd2-base.sh > $(BIN)/gmd2.sh
+	chmod +x $(BIN)/gmd2.sh
 
 $(OBJ)/smalldistances.o : $(SRC)/smalldistances.f90
 	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/smalldistances.o $(SRC)/smalldistances.f90
