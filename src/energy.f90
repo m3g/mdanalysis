@@ -240,7 +240,8 @@ if ( ngroup1 == 0 .or. ngroup2 == 0 ) then
   write(*,*) ' ERROR: Each groups must have at least one atom. ' 
   stop
 end if
-allocate ( group1(ngroup1), group2(ngroup2), group3(max0(ngroup3,1)) )
+allocate ( group1(ngroup1), group2(ngroup2) )
+if ( ngroup3 > 0 ) allocate(group3(ngroup3))
 close(10)
 
 ! Now reading reading the group atoms
@@ -281,7 +282,7 @@ do
 end do
 close(10)
 lastatom = max0(group1(ngroup1),group2(ngroup2))
-lastatom = max0(lastatom,group3(ngroup3))
+if ( ngroup3 > 0 ) lastatom = max0(lastatom,group3(ngroup3))
 lastatom = max0(lastatom,catom)
  
 ! Output some group properties for testing purposes

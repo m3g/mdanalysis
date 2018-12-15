@@ -791,6 +791,7 @@ end subroutine getmaxmin
 !
 subroutine getnframes(iunit,nframes,dcdaxis,lastframe)
 
+  implicit none
   integer :: iunit, nframes, status
   logical :: dcdaxis
   integer :: i, lastframe
