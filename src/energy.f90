@@ -336,7 +336,7 @@ read(10) ntotat
 write(*,*)
 write(*,*) ' Number of atoms as specified in the dcd file: ',ntotat     
 write(*,*) ' Determining the number of frames of dcd file ... '
-call getnframes(10,nframes,dcdaxis)
+call getnframes(10,nframes,dcdaxis,lastframe)
 if( lastframe == 0 ) lastframe = nframes
 write(*,*) ' Number of frames in DCD file: ', nframes
 
