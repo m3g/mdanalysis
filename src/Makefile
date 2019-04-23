@@ -148,9 +148,6 @@ $(BIN)/gmd2.sh : $(SCR)/gmd2-base.sh
 	sed 's!PWD!$(IDIR)!' $(SCR)/gmd2-base.sh > $(BIN)/gmd2.sh
 	chmod +x $(BIN)/gmd2.sh
 
-$(OBJ)/smalldistances.o : $(SRC)/smalldistances.f90
-	$(FORTRAN) $(FLAGS) -c -o $(OBJ)/smalldistances.o $(SRC)/smalldistances.f90
-
 
 #
 # angles module
