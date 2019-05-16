@@ -866,6 +866,7 @@ module file_operations
       do while(i > 0)
         if ( remove_extension(i:i) == "." ) then
           idot = i
+          exit
         end if
         i = i - 1
       end do
@@ -874,7 +875,7 @@ module file_operations
       do i = idot, 200
         remove_extension(i:i) = achar(32)
       end do
-    
+
     end function remove_extension
 
     !
