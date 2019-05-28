@@ -52,8 +52,8 @@ subroutine smalldistances(ngroup1,group1,ngroup2,group2,x,y,z,cutoff,&
 
   logical :: memerror
   integer :: maxsmalld
-  integer :: ismalld(nsmalld,2)
-  real :: dsmalld(nsmalld)
+  integer :: ismalld(maxsmalld,2)
+  real :: dsmalld(maxsmalld)
 
   ! Get the axis of the periodic cell 
 
@@ -247,8 +247,8 @@ subroutine smalldcell(x,y,z,ii,igroup1,group2,ibox,jbox,kbox,&
   
    logical :: memerror
    integer :: maxsmalld
-   integer :: ismalld(nsmalld,2)
-   real :: dsmalld(nsmalld)
+   integer :: ismalld(maxsmalld,2)
+   real :: dsmalld(maxsmalld)
 
    igroup2 = iatomfirst(ibox,jbox,kbox)
    do while( igroup2 /= 0 )

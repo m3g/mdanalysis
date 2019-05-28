@@ -578,7 +578,7 @@ program g_minimum_distance
       md_atom_contribution(j,i) = 0.e0
     end do
     do j = 1, nsolute
-      md_atom_contribution_solute(i,j) = 0.e0
+      md_atom_contribution_solute(j,i) = 0.e0
     end do
   end do
   bulkdensity = 0.e0
@@ -1179,7 +1179,7 @@ program g_minimum_distance
   write(20,"(a)") "#"
   write(20,"(a)") "# Atoms: "
   do i = 1, nsolute
-    write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solvent(i)), classat(solvent(i)), mass(solvent(i))
+    write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solute(i)), classat(solute(i)), mass(solute(i))
   end do
   write(20,"(a)") "#"
   write(lineformat,*) "('#',t7,'DISTANCE     GMD TOTAL',",nsolute,"(tr2,i12) )"
