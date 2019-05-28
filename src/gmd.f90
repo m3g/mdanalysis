@@ -79,7 +79,7 @@ program g_minimum_distance
   character(len=200) :: groupfile, line, record, value, keyword,&
                         dcdfile, inputfile, psffile, file,&
                         lineformat
-  character(len=200) :: output, output_atom_gmd_contrib
+  character(len=200) :: output, output_atom_gmd_contrib, output_atom_gmd_contrib_solute
   character(len=4) :: dummyc
   character(len=5) :: format
   logical :: readfromdcd, dcdaxis, periodic, onscreenprogress, usecutoff
@@ -93,8 +93,8 @@ program g_minimum_distance
   
   integer, allocatable :: solute2(:), solvent_random(:)
   integer, allocatable :: solute(:), solvent(:), resid(:), &
-                          irsolv(:), ismalld(:), irsolv_random(:)
-  integer, allocatable :: imind(:)
+                          irsolv(:), ismalld(:,:), irsolv_random(:)
+  integer, allocatable :: imind(:,:)
 
   ! Shell volume, estimated from atom count
   real, allocatable :: shellvolume(:)
@@ -103,6 +103,7 @@ program g_minimum_distance
   real, allocatable :: md_count(:)
   real, allocatable :: md_count_random(:)
   real, allocatable :: md_atom_contribution(:,:)
+  real, allocatable :: md_atom_contribution_solute(:,:)
   real :: md_sum
   real :: md_sum_random
 
@@ -114,6 +115,7 @@ program g_minimum_distance
 
   ! This is to compute the atomic contributions to gmd (md_atom_contribution/md_count_random)
   real, allocatable :: gmd_atom_contribution(:,:)
+  real, allocatable :: gmd_atom_contribution_solute(:,:)
 
   ! Data read from the psf file, not necessarily used here
   real, allocatable :: eps(:), sig(:), q(:), e(:), s(:), mass(:)
@@ -279,6 +281,7 @@ program g_minimum_distance
   ! Names of auxiliary output files
   
   output_atom_gmd_contrib = output(1:length(remove_extension(output)))//"-GMD_ATOM_CONTRIB."//file_extension(output)
+  output_atom_gmd_contrib_solute = output(1:length(remove_extension(output)))//"-GMD_ATOM_SOLUTE_CONTRIB."//file_extension(output)
 
   ! Reading the header of psf file
   
@@ -495,13 +498,13 @@ program g_minimum_distance
   ! Initialization of the smalldistances routine arrays
  
   maxsmalld = nrsolvent_random
-  allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
+  allocate( ismalld(maxsmalld,2), dsmalld(maxsmalld) )
 
   ! Allocate xyz and minimum-distance count arrays
 
   maxatom = max(natom,nsolute+max(nsolvent,natsolvent_random))
   allocate( x(maxatom), y(maxatom), z(maxatom) )
-  allocate( imind(nrsolvent_random), mind_mol(nrsolvent_random), mind_atom(natsolvent_random) )
+  allocate( imind(nrsolvent_random,2), mind_mol(nrsolvent_random), mind_atom(natsolvent_random) )
 
   ! Allocate solvent molecule (this will be used to generate random coordinates
   ! for each solvent molecule, one at a time, later)
@@ -511,6 +514,8 @@ program g_minimum_distance
             xrnd(natoms_solvent), yrnd(natoms_solvent), zrnd(natoms_solvent) )
   allocate( gmd_atom_contribution(natoms_solvent,nbins), & 
             md_atom_contribution(natoms_solvent,nbins) )
+  allocate( gmd_atom_contribution_solute(nsolute,nbins), & 
+            md_atom_contribution_solute(nsolute,nbins) )
 
   ! These will contain indexes for the atoms of the randomly generated solvent molecules,
   ! which are more than the number of the atoms of the solvent in the actual
@@ -571,6 +576,9 @@ program g_minimum_distance
     shellvolume(i) = 0.e0
     do j = 1, natoms_solvent
       md_atom_contribution(j,i) = 0.e0
+    end do
+    do j = 1, nsolute
+      md_atom_contribution_solute(i,j) = 0.e0
     end do
   end do
   bulkdensity = 0.e0
@@ -672,7 +680,7 @@ program g_minimum_distance
         if ( memerror ) then
           deallocate( ismalld, dsmalld )
           maxsmalld = int(1.5*nsmalld)
-          allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
+          allocate( ismalld(maxsmalld,2), dsmalld(maxsmalld) )
         end if
       end do
 
@@ -683,24 +691,29 @@ program g_minimum_distance
       ! For each solvent residue, get the MINIMUM distance to the solute
     
       do i = 1, nrsolvent
-        mind_mol(i) = cutoff + 1.e0
-        imind(i) = 0
+        mind_mol(i) = cutoff + 1.e0 ! Minimum distance found for this solvent molecule
+        imind(i,1) = 0 ! Solute atom corresponding to this minimum distance
+        imind(i,2) = 0 ! Solvent atom corresponding to this minimum distance
       end do
       do i = 1, nsolvent
         mind_atom(i) = cutoff + 1.e0
       end do
       do i = 1, nsmalld
         ! Counting for computing the whole-molecule gmd 
-        isolvent = irsolv(ismalld(i))
+        isolvent = irsolv(ismalld(i,2))
         if ( dsmalld(i) < mind_mol(isolvent) ) then
+          ! Updating minimum distance to this solvent molecule
           mind_mol(isolvent) = dsmalld(i)
-          j = mod(ismalld(i),natoms_solvent) 
+          ! Annotating to which solute atom this md corresponds
+          imind(isolvent,1) = ismalld(i,1)
+          ! Annotating to which solvent atom this md corresponds
+          j = mod(ismalld(i,2),natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
-          imind(isolvent) = j
+          imind(isolvent,2) = j
         end if
         ! Counting for computing atom-specific gmd
-        if ( dsmalld(i) < mind_atom(ismalld(i)) ) then
-          mind_atom(ismalld(i)) = dsmalld(i)
+        if ( dsmalld(i) < mind_atom(ismalld(i,2)) ) then
+          mind_atom(ismalld(i,2)) = dsmalld(i)
         end if
       end do
 
@@ -709,9 +722,15 @@ program g_minimum_distance
       do i = 1, nrsolvent
         irad = int(float(nbins)*mind_mol(i)/cutoff)+1
         if( irad <= nbins ) then
+          ! Summing up the total minimum-distance count
           md_count(irad) = md_count(irad) + 1.e0
-          if ( imind(i) > 0 ) then
-            md_atom_contribution(imind(i),irad) = md_atom_contribution(imind(i),irad) + 1.e0
+          ! Summing up the solvent atomic contribution
+          if ( imind(i,2) > 0 ) then
+            md_atom_contribution(imind(i,2),irad) = md_atom_contribution(imind(i,2),irad) + 1.e0
+          end if
+          ! Summing up the solute atomic contribution
+          if ( imind(i,1) > 0 ) then
+            md_atom_contribution_solute(imind(i,1),irad) = md_atom_contribution_solute(imind(i,1),irad) + 1.e0
           end if
         end if
       end do
@@ -842,7 +861,7 @@ program g_minimum_distance
         if ( memerror ) then
           deallocate( ismalld, dsmalld )
           maxsmalld = int(1.5*nsmalld)
-          allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
+          allocate( ismalld(maxsmalld,2), dsmalld(maxsmalld) )
         end if
       end do
 
@@ -851,15 +870,15 @@ program g_minimum_distance
 
       do i = 1, nrsolvent_random
         mind_mol(i) = cutoff + 1.e0
-        imind(i) = 0
+        imind(i,2) = 0
       end do
       do i = 1, nsmalld
-        isolvent = irsolv_random(ismalld(i))
+        isolvent = irsolv_random(ismalld(i,2))
         if ( dsmalld(i) < mind_mol(isolvent) ) then
           mind_mol(isolvent) = dsmalld(i)
-          j = mod(ismalld(i),natoms_solvent) 
+          j = mod(ismalld(i,2),natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
-          imind(isolvent) = j
+          imind(isolvent,2) = j
         end if
       end do
 
@@ -879,8 +898,8 @@ program g_minimum_distance
         mind_atom(i) = cutoff + 1.e0
       end do
       do i = 1, nsmalld
-        if ( dsmalld(i) < mind_atom(ismalld(i)) ) then
-          mind_atom(ismalld(i)) = dsmalld(i)
+        if ( dsmalld(i) < mind_atom(ismalld(i,2)) ) then
+          mind_atom(ismalld(i,2)) = dsmalld(i)
         end if
       end do
       if ( usecutoff ) then
@@ -977,6 +996,9 @@ program g_minimum_distance
     do j = 1, natoms_solvent
       md_atom_contribution(j,i) = md_atom_contribution(j,i)/frames
     end do
+    do j = 1, nsolute
+      md_atom_contribution_solute(j,i) = md_atom_contribution_solute(j,i)/frames
+    end do
     shellvolume(i) = ((shellvolume(i)/nrsolvent_random)*av_totalvolume)/frames
 
     ! GMD distributions
@@ -986,10 +1008,16 @@ program g_minimum_distance
       do j = 1, natoms_solvent
         gmd_atom_contribution(j,i) = md_atom_contribution(j,i)/md_count_random(i)
       end do
+      do j = 1, nsolute
+        gmd_atom_contribution_solute(j,i) = md_atom_contribution_solute(j,i)/md_count_random(i)
+      end do
     else
       gmd(i) = 0.e0
       do j = 1, natoms_solvent
         gmd_atom_contribution(j,i) = 0.e0
+      end do
+      do j = 1, nsolute
+        gmd_atom_contribution_solute(j,i) = 0.e0
       end do
     end if
 
@@ -1116,10 +1144,10 @@ program g_minimum_distance
   end do
   close(20)
 
-  ! Writting gmd per atom contributions 
+  ! Writting gmd per atom contributions for the solvent
 
   open(20,file=output_atom_gmd_contrib)
-  write(20,"(a)") "# Total GMD contribution per atom. "
+  write(20,"(a)") "# Solvent atomic contributions to total GMD. "
   write(20,"( '#',/,&
              &'# Input file: ',a,/,& 
              &'# DCD file: ',a,/,& 
@@ -1139,10 +1167,10 @@ program g_minimum_distance
   end do
   close(20)
 
-  ! Writting gmd per atom contributions 
+  ! Writting gmd per atom contributions for the solute
 
-  open(20,file=output_atom_gmd_contrib)
-  write(20,"(a)") "# Atomic contributions to total GMD. "
+  open(20,file=output_atom_gmd_contrib_solute)
+  write(20,"(a)") "# Solute atomic contributions to total GMD. "
   write(20,"( '#',/,&
              &'# Input file: ',a,/,& 
              &'# DCD file: ',a,/,& 
@@ -1150,15 +1178,15 @@ program g_minimum_distance
              &'# PSF file: ' )")
   write(20,"(a)") "#"
   write(20,"(a)") "# Atoms: "
-  do i = 1, natoms_solvent
+  do i = 1, nsolute
     write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solvent(i)), classat(solvent(i)), mass(solvent(i))
   end do
   write(20,"(a)") "#"
-  write(lineformat,*) "('#',t7,'DISTANCE     GMD TOTAL',",natoms_solvent,"(tr2,i12) )"
-  write(20,lineformat) (i,i=1,natoms_solvent)
-  write(lineformat,*) "(",natoms_solvent+2,"(tr2,f12.5))"
+  write(lineformat,*) "('#',t7,'DISTANCE     GMD TOTAL',",nsolute,"(tr2,i12) )"
+  write(20,lineformat) (i,i=1,nsolute)
+  write(lineformat,*) "(",nsolute+2,"(tr2,f12.5))"
   do i = 1, nbins
-    write(20,lineformat) shellradius(i,binstep), gmd(i), (gmd_atom_contribution(j,i),j=1,natoms_solvent)
+    write(20,lineformat) shellradius(i,binstep), gmd(i), (gmd_atom_contribution_solute(j,i),j=1,nsolute)
   end do
   close(20)
 
@@ -1170,7 +1198,8 @@ program g_minimum_distance
   write(*,*)
   write(*,*) ' OUTPUT FILES: ' 
   write(*,*)
-  write(*,*) ' Wrote atomic GMD contributions to file: ', trim(adjustl(output_atom_gmd_contrib))
+  write(*,*) ' Wrote solvent atomic GMD contributions to file: ', trim(adjustl(output_atom_gmd_contrib))
+  write(*,*) ' Wrote solute atomic GMD contributions to file: ', trim(adjustl(output_atom_gmd_contrib_solute))
   write(*,*)
   write(*,*) ' Wrote main output file: ', trim(adjustl(output))
   write(*,*)

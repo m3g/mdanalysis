@@ -93,7 +93,7 @@ program g_minimum_distance
   
   integer, allocatable :: solute2(:), solvent_random(:)
   integer, allocatable :: solute(:), solvent(:), resid(:), &
-                          irsolv(:), ismalld(:), irsolv_random(:)
+                          irsolv(:), ismalld(:,:), irsolv_random(:)
   integer, allocatable :: imind(:)
 
   ! Shell volume, estimated from atom count
@@ -497,7 +497,7 @@ program g_minimum_distance
   ! Initialization of the smalldistances routine arrays
  
   maxsmalld = nrsolvent_random
-  allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
+  allocate( ismalld(maxsmalld,2), dsmalld(maxsmalld) )
 
   ! Allocate xyz and minimum-distance count arrays
 
@@ -675,7 +675,7 @@ program g_minimum_distance
         if ( memerror ) then
           deallocate( ismalld, dsmalld )
           maxsmalld = int(1.5*nsmalld)
-          allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
+          allocate( ismalld(maxsmalld,2), dsmalld(maxsmalld) )
         end if
       end do
 
@@ -694,16 +694,16 @@ program g_minimum_distance
       end do
       do i = 1, nsmalld
         ! Counting for computing the whole-molecule gmd 
-        isolvent = irsolv(ismalld(i))
+        isolvent = irsolv(ismalld(i,2))
         if ( dsmalld(i) < mind_mol(isolvent) ) then
           mind_mol(isolvent) = dsmalld(i)
-          j = mod(ismalld(i),natoms_solvent) 
+          j = mod(ismalld(i,2),natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
           imind(isolvent) = j
         end if
         ! Counting for computing atom-specific gmd
-        if ( dsmalld(i) < mind_atom(ismalld(i)) ) then
-          mind_atom(ismalld(i)) = dsmalld(i)
+        if ( dsmalld(i) < mind_atom(ismalld(i,2)) ) then
+          mind_atom(ismalld(i,2)) = dsmalld(i)
         end if
       end do
 
@@ -852,7 +852,7 @@ program g_minimum_distance
         if ( memerror ) then
           deallocate( ismalld, dsmalld )
           maxsmalld = int(1.5*nsmalld)
-          allocate( ismalld(maxsmalld), dsmalld(maxsmalld) )
+          allocate( ismalld(maxsmalld,2), dsmalld(maxsmalld) )
         end if
       end do
 
@@ -864,10 +864,10 @@ program g_minimum_distance
         imind(i) = 0
       end do
       do i = 1, nsmalld
-        isolvent = irsolv_random(ismalld(i))
+        isolvent = irsolv_random(ismalld(i,2))
         if ( dsmalld(i) < mind_mol(isolvent) ) then
           mind_mol(isolvent) = dsmalld(i)
-          j = mod(ismalld(i),natoms_solvent) 
+          j = mod(ismalld(i,2),natoms_solvent) 
           if ( j == 0 ) j = natoms_solvent
           imind(isolvent) = j
         end if
@@ -889,8 +889,8 @@ program g_minimum_distance
         mind_atom(i) = cutoff + 1.e0
       end do
       do i = 1, nsmalld
-        if ( dsmalld(i) < mind_atom(ismalld(i)) ) then
-          mind_atom(ismalld(i)) = dsmalld(i)
+        if ( dsmalld(i) < mind_atom(ismalld(i,2)) ) then
+          mind_atom(ismalld(i,2)) = dsmalld(i)
         end if
       end do
       if ( usecutoff ) then
