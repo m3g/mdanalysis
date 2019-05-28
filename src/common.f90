@@ -14,7 +14,7 @@ end module charsize
 subroutine version()
   
   write(*,*) 
-  write(*,*) ' Version 19.136 '
+  write(*,*) ' Version 19.148 '
   write(*,*) 
 
 end subroutine version
