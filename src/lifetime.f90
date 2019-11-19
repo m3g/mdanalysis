@@ -67,7 +67,11 @@ program lifetime
     end if
     if ( iframe /= lastframe ) then
       nframes = nframes + 1
-      deltaframe = iframe - lastframe
+      if ( deltaframe == 0 ) then
+        deltaframe = iframe - lastframe
+      else
+        deltaframe = min(deltaframe,iframe-lastframe)
+      end if
       lastframe = iframe
     end if
     ndata = ndata + 1
