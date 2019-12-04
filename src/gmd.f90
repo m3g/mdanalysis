@@ -1179,7 +1179,7 @@ program g_minimum_distance
   write(20,"(a)") "#"
   write(20,"(a)") "# Atoms: "
   do i = 1, nsolute
-    write(20,"( '#', i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, typeat(solute(i)), classat(solute(i)), mass(solute(i))
+    write(20,"( '#', i6, tr2, i6, 2(tr2,a), tr2,' mass: ',f12.5 )") i, solute(i), typeat(solute(i)), classat(solute(i)), mass(solute(i))
   end do
   write(20,"(a)") "#"
   write(lineformat,*) "('#',t7,'DISTANCE     GMD TOTAL',",nsolute,"(tr2,i12) )"
