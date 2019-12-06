@@ -9,7 +9,7 @@
 # If you want to compile with some specific fortran compiler, you 
 # must change the line below to the path of your fortran compiler. 
 #
-# Version 19.323
+# Version 19.340
 #
 FORTRAN = gfortran
 #FORTRAN = ifort
